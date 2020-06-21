@@ -209,7 +209,42 @@ void mutate_add_connection(
 void mutate_add_gene(
     genome_t *genome,
     neat_t *neat) {
-    // First get a random connection
+    // First get a random connection in the genome
+    if (genome->connection_count) {
+        uint32_t random_connection = rand() % genome->connection_count;
+        gene_connection_t *connection = &genome->connections[random_connection];
+
+        gene_t *dst = &neat->genes[connection->from];
+        gene_t *src = &neat->genes[connection->to];
+
+        uint32_t middle_x = (dst->x + src->x) / 2;
+        float middle_y = (dst->y + src->y) / 2.0f + s_rand_01() / 5.0f; // Some noise
+
+        uint32_t new_gene_index = neat->gene_count++;
+        gene_t *new_gene_ptr = &neat->genes[new_gene_index];
+
+        new_gene_ptr->x = middle_x;
+        new_gene_ptr->y = middle_y;
+
+        genome->genes[genome->gene_count++] = new_gene_index;
+
+        // Prev = before the new node, next = after the new node
+        gene_connection_t *prev_connection, *next_connection;
+
+        uint32_t prev_connection_index = neat->connection_count++;
+        uint64_t prev_connection_hash = s_connection_hash(
+            connection->from,
+            new_gene_index);
+        neat->connection_finder->insert(
+            prev_connection_hash,
+            prev_connection_index);
+        
+
+        uint32_t next_connection_index = neat->connection_count++;
+        uint64_t next_connection_hash = s_connection_hash(
+            new_gene_index,
+            connection->to);
+    }
 }
 
 void mutate_shift_weight(

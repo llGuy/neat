@@ -9,8 +9,10 @@ struct gene_t {
     float y;
 };
 
+typedef uint32_t gene_id_t;
+
 struct gene_connection_t {
-    uint16_t from, to;
+    uint32_t from, to;
     uint32_t innovation_number;
     uint32_t enabled;
     float weight;

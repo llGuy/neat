@@ -209,7 +209,10 @@ void mutate_add_connection(
 void mutate_add_gene(
     genome_t *genome,
     neat_t *neat) {
-    // First get a random connection
+    // First get a random connection in the genome
+    if (genome->connection_count) {
+        
+    }
 }
 
 void mutate_shift_weight(

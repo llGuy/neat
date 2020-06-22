@@ -137,7 +137,8 @@ void prepare_neat(
         gene->y = (float)(i - input_count) / (float)output_count;
     }
 
-    neat->input_output_count = input_count + output_count;
+    neat->input_count = input_count;
+    neat->output_count = output_count;
 }
 
 genome_t genome_init(
@@ -153,7 +154,7 @@ genome_t genome_init(
     genome.connections.init(neat->connections.max_connection_count);
 
     // For now, we just need to add the inputs and outputs
-    for (uint32_t i = 0; i < neat->input_output_count; ++i) {
+    for (uint32_t i = 0; i < neat->input_count + neat->output_count; ++i) {
         genome.genes[i] = i;
     }
 
@@ -576,6 +577,7 @@ genome_t genome_crossover(
         memcpy(connection, a_connection, sizeof(gene_connection_t));
     }
 
+    // TODO: This won't work - there would be duplication issues - need to resolve now
     for (uint32_t i = 0; i < result.connections.connection_count; ++i) {
         result.genes[result.gene_count++] = result.connections.get(i)->from;
         result.genes[result.gene_count++] = result.connections.get(i)->to;
@@ -589,4 +591,134 @@ void prepare_genome_for_breed(
     genome_t *a) {
     s_sort_by_innovation_number(neat, a);
     s_sort_by_position(neat, a);
+}
+
+static float s_activation_function(
+    float x) {
+    return 1.0f / (1.0f + exp(x));
+}
+
+struct connection_t {
+    uint32_t node_from;
+    uint32_t node_to;
+};
+
+// Need to create a new sort of structure because an
+// activation function needs to be applied to the output
+// of each node.
+struct node_t {
+    gene_id_t gene_id;
+
+    uint32_t x;
+    float current_value;
+
+    uint32_t connection_count;
+    // May have to increase this in the future
+    uint32_t connections[50];
+};
+
+static connection_t *dummy_connections;
+static node_t *dummy_nodes;
+static uint32_t *node_indices;
+static connection_finder_t finder;
+
+void run_genome(
+    neat_t *neat,
+    genome_t *genome,
+    float *inputs,
+    float *outputs) {
+    finder.clear();
+
+    uint32_t node_count = 0;
+
+    // Set all the values in the nodes to 0
+    for (uint32_t i = 0; i < genome->gene_count; ++i) {
+        finder.insert(genome->genes[i], i);
+        dummy_nodes[i].gene_id = genome->genes[i];
+
+        gene_t *gene = &neat->genes[dummy_nodes[i].gene_id];
+
+        dummy_nodes[i].x = gene->x;
+        dummy_nodes[i].connection_count = 0;
+
+        if (i < neat->input_count) {
+            dummy_nodes[i].current_value = inputs[i];
+        }
+
+        // We will sort this later according to the x values
+        node_indices[i] = i;
+    }
+
+    // Fill the connections:
+    for (uint32_t i = 0; i < genome->connections.connection_count; ++i) {
+        gene_connection_t *connection = genome->connections.get(i);
+        
+        uint32_t *node_index = finder.get(connection->to);
+
+        if (!node_index) {
+            printf("ERROR: Connection has destination which does not exist in the genome's gene list\n");
+            assert(0);
+        }
+
+        dummy_nodes[*node_index].connections[dummy_nodes->connection_count++] = i;
+    }
+
+    // Sort out in terms of the x values
+    for (uint32_t i = 0; i < genome->gene_count - 1; ++i) {
+        uint32_t current_node_index = node_indices[i];
+        uint32_t current_x = dummy_nodes[current_node_index].x;
+
+        uint32_t next_node_index = node_indices[i + 1];
+        uint32_t next_x = dummy_nodes[next_node_index].x;
+        
+        if (current_x > next_x) {
+            uint32_t tmp = current_node_index;
+            node_indices[i] = next_node_index;
+            node_indices[i + 1] = tmp;
+
+            // Problem, need to switch
+            for (uint32_t j = i - 1; j >= 0; ++j) {
+                current_node_index = node_indices[j];
+                current_x = dummy_nodes[current_node_index].x;
+
+                next_node_index = node_indices[j + 1];
+                next_x = dummy_nodes[next_node_index].x;
+        
+                if (current_x > next_x) {
+                    tmp = current_node_index;
+                    node_indices[j] = next_node_index;
+                    node_indices[j + 1] = tmp;
+                }
+                else {
+                    break;
+                }
+            } 
+        }
+    }
+
+    // This is not going to work - need to do something creative
+    for (uint32_t i = 0; i < genome->gene_count; ++i) {
+        node_t *node = &dummy_nodes[node_indices[i]];
+
+        for (uint32_t c = 0; c < node->connection_count; ++c) {
+            uint32_t connection_index = node->connections[c];
+            gene_connection_t *connection = genome->connections.get(connection_index);
+
+            if (connection->enabled) {
+                uint32_t *from_index = finder.get(connection->from);
+                uint32_t *to_index = finder.get(connection->to);
+                node_t *from = &dummy_nodes[*from_index];
+                node_t *to = &dummy_nodes[*to_index];
+
+                if (to != node) {
+                    printf("ERROR: WE GOT A PROBLEM\n");
+                    assert(0);
+                }
+
+                to->current_value += connection->weight * from->current_value;
+            }
+        }
+
+        node->current_value = s_activation_function(node->current_value);
+    }
 }

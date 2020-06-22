@@ -62,7 +62,7 @@ struct gene_connection_tracker_t {
 // Structure which holds information on ALL the genes / gene connections
 // that exist at the moment
 struct neat_t {
-    uint32_t input_output_count;
+    uint32_t input_count, output_count;
 
     uint32_t gene_count, max_gene_count;
     gene_t *genes;
@@ -98,6 +98,11 @@ genome_t genome_init(
 void prepare_genome_for_breed(
     neat_t *neat,
     genome_t *a);
+
+// Has to match the number of inputs/outputs specified when creating the NEAT
+void run_genome(
+    float *inputs,
+    float *outputs);
 
 // Simply adds connection between two genes
 void mutate_add_connection(

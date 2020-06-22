@@ -60,12 +60,12 @@ uint32_t gene_connection_tracker_t::remove_connection(
     gene_id_t from,
     gene_id_t to) {
     uint64_t hash = s_connection_hash(from, to);
-    uint32_t *index = finder->get(hash);
+    uint32_t index = *(finder->get(hash));
 
     // Just remove the hash
     finder->remove(hash);
 
-    return *index;
+    return index;
 }
 
 gene_connection_t *gene_connection_tracker_t::get(
@@ -123,7 +123,7 @@ void prepare_neat(
     for (; i < input_count + output_count; ++i) {
         gene_t *gene = &neat->genes[i];
         gene->x = neat->max_gene_count;
-        gene->y = (float)i / (float)output_count;
+        gene->y = (float)(i - input_count) / (float)output_count;
     }
 }
 
@@ -132,7 +132,8 @@ genome_t genome_init(
     genome_t genome;
 
     genome.max_gene_count = neat->max_gene_count;
-    genome.gene_count = 0;
+    // For the inputs and outputs
+    genome.gene_count = neat->gene_count;
     genome.genes = (uint32_t *)malloc(
         sizeof(uint32_t) * neat->max_gene_count);
 
@@ -248,14 +249,16 @@ void mutate_add_gene(
         uint32_t random_connection = rand() % genome->connections.connection_count;
         gene_connection_t *connection = genome->connections.get(random_connection);
 
-        gene_t *dst = &neat->genes[connection->from];
-        gene_t *src = &neat->genes[connection->to];
+        gene_t *src = &neat->genes[connection->from];
+        gene_t *dst = &neat->genes[connection->to];
 
         uint32_t middle_x = (dst->x + src->x) / 2;
         float middle_y = (dst->y + src->y) / 2.0f + s_rand_01() / 5.0f; // Some noise
 
         gene_id_t new_gene_id = neat->gene_count++;
         gene_t *new_gene_ptr = &neat->genes[new_gene_id];
+
+        printf("New gene ID: %d - produced from previous connection: %d to %d\n", new_gene_id, connection->from, connection->to);
 
         new_gene_ptr->x = middle_x;
         new_gene_ptr->y = middle_y;

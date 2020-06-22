@@ -26,6 +26,10 @@ struct gene_connection_tracker_t {
     uint32_t connection_count, max_connection_count;
     gene_connection_t *connections;
 
+    // Indices of the connections that are sorted
+    uint32_t *connections_by_innovation_number;
+    uint32_t *connections_by_position;
+
     void init(
         uint32_t max_connection_count);
 
@@ -58,6 +62,8 @@ struct gene_connection_tracker_t {
 // Structure which holds information on ALL the genes / gene connections
 // that exist at the moment
 struct neat_t {
+    uint32_t input_output_count;
+
     uint32_t gene_count, max_gene_count;
     gene_t *genes;
 
@@ -89,6 +95,10 @@ struct genome_t {
 genome_t genome_init(
     neat_t *neat);
 
+void prepare_genome_for_breed(
+    neat_t *neat,
+    genome_t *a);
+
 // Simply adds connection between two genes
 void mutate_add_connection(
     genome_t *genome,
@@ -111,3 +121,8 @@ void mutate_random_weight(
 void mutate_connection_toggle(
     genome_t *genome,
     neat_t *neat);
+
+// Need the connections to be sorted by innovation number
+float genome_distance(
+    genome_t *a,
+    genome_t *b);

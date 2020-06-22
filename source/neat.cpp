@@ -5,6 +5,9 @@
 #include <memory.h>
 #include <math.h>
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 static uint64_t s_connection_hash(
     gene_id_t gene_from,
     gene_id_t gene_to) {
@@ -27,6 +30,9 @@ void gene_connection_tracker_t::init(
     finder = (connection_finder_t *)malloc(
         sizeof(connection_finder_t));
 
+    connections_by_innovation_number = (uint32_t *)malloc(sizeof(uint32_t) * max_connection_count);
+    connections_by_position = (uint32_t *)malloc(sizeof(uint32_t) * max_connection_count);
+
     memset(finder, 0, sizeof(connection_finder_t));
     finder->init();
 }
@@ -36,6 +42,8 @@ uint32_t gene_connection_tracker_t::add_connection(
     gene_id_t to) {
     uint32_t new_connection_index = connection_count++;
     gene_connection_t *new_connection_ptr = &connections[new_connection_index];
+    connections_by_innovation_number[new_connection_index] = new_connection_index;
+    connections_by_position[new_connection_index] = new_connection_index;
 
     uint64_t hash = s_connection_hash(from, to);
     finder->insert(hash, new_connection_index);
@@ -49,6 +57,9 @@ uint32_t gene_connection_tracker_t::add_connection(
     uint32_t connection_index) {
     uint32_t new_connection_index = connection_index;
     gene_connection_t *new_connection_ptr = &connections[new_connection_index];
+
+    connections_by_innovation_number[new_connection_index] = new_connection_index;
+    connections_by_position[new_connection_index] = new_connection_index;
 
     uint64_t hash = s_connection_hash(from, to);
     finder->insert(hash, new_connection_index);
@@ -125,6 +136,8 @@ void prepare_neat(
         gene->x = neat->max_gene_count;
         gene->y = (float)(i - input_count) / (float)output_count;
     }
+
+    neat->input_output_count = input_count + output_count;
 }
 
 genome_t genome_init(
@@ -140,7 +153,7 @@ genome_t genome_init(
     genome.connections.init(neat->connections.max_connection_count);
 
     // For now, we just need to add the inputs and outputs
-    for (uint32_t i = 0; i < neat->gene_count; ++i) {
+    for (uint32_t i = 0; i < neat->input_output_count; ++i) {
         genome.genes[i] = i;
     }
 
@@ -213,6 +226,8 @@ void mutate_add_connection(
                 // No need to set the innovation number because the innovation
                 // number will have been set if the connection has been added
                 // before (also through the memcpy)
+
+                printf("Connection was created before in the NEAT\n");
             }
             else {
                 // Here we need to add the connection in the NEAT
@@ -342,4 +357,236 @@ void mutate_connection_toggle(
     gene_connection_t *connection = genome->connections.get(random_connection_id);
 
     connection->enabled = !connection->enabled;
+}
+
+static void s_sort_by_position(
+    neat_t *neat,
+    genome_t *a) {
+    // Sort for the positions (of the output node)
+    for (uint32_t i = 0; i < a->connections.connection_count - 1; ++i) {
+        uint32_t current_index = a->connections.connections_by_position[i];
+        uint32_t next_index = a->connections.connections_by_position[i + 1];
+
+        gene_connection_t *current_connection = a->connections.get(current_index);
+        gene_t *current_output_gene = &neat->genes[current_connection->to];
+        uint32_t current_x = current_output_gene->x;
+
+        gene_connection_t *next_connection = a->connections.get(next_index);
+        gene_t *next_output_gene = &neat->genes[next_connection->to];
+        uint32_t next_x = next_output_gene->x;
+        
+        if (current_x > next_x) {
+            uint32_t tmp = current_index;
+            a->connections.connections_by_position[i] = next_index;
+            a->connections.connections_by_position[i + 1] = tmp;
+
+            // Problem, need to switch
+            for (uint32_t j = i - 1; j >= 0; ++j) {
+                current_index = a->connections.connections_by_position[j];
+                next_index = a->connections.connections_by_position[j + 1];
+
+                current_connection = a->connections.get(current_index);
+                current_output_gene = &neat->genes[current_connection->to];
+                current_x = current_output_gene->x;
+
+                next_connection = a->connections.get(next_index);
+                next_output_gene = &neat->genes[next_connection->to];
+                next_x = next_output_gene->x;
+        
+                if (current_x > next_x) {
+                    tmp = current_index;
+                    a->connections.connections_by_position[j] = next_index;
+                    a->connections.connections_by_position[j + 1] = tmp;
+                }
+                else {
+                    break;
+                }
+            } 
+        }
+    }
+}
+
+static void s_sort_by_innovation_number(
+    neat_t *neat,
+    genome_t *a) {
+    // Sort for the innovation numbers
+    for (uint32_t i = 0; i < a->connections.connection_count - 1; ++i) {
+        uint32_t current_index = a->connections.connections_by_innovation_number[i];
+        uint32_t next_index = a->connections.connections_by_innovation_number[i + 1];
+
+        gene_connection_t *current_connection = a->connections.get(current_index);
+        uint32_t current_innovation = current_connection->innovation_number;
+
+        gene_connection_t *next_connection = a->connections.get(next_index);
+        uint32_t next_innovation = next_connection->innovation_number;
+        
+        if (current_innovation > next_innovation) {
+            uint32_t tmp = current_index;
+            a->connections.connections_by_innovation_number[i] = next_index;
+            a->connections.connections_by_innovation_number[i + 1] = tmp;
+
+            // Problem, need to switch
+            for (uint32_t j = i - 1; j >= 0; ++j) {
+                current_index = a->connections.connections_by_innovation_number[j];
+                next_index = a->connections.connections_by_innovation_number[j + 1];
+
+                current_connection = a->connections.get(current_index);
+                current_innovation= current_connection->innovation_number;
+
+                next_connection = a->connections.get(next_index);
+                next_innovation= next_connection->innovation_number;
+        
+                if (current_innovation > next_innovation) {
+                    tmp = current_index;
+                    a->connections.connections_by_innovation_number[j] = next_index;
+                    a->connections.connections_by_innovation_number[j + 1] = tmp;
+                }
+                else {
+                    break;
+                }
+            } 
+        }
+    }
+}
+
+#define DISTANCE_FACTOR0 1.0f
+#define DISTANCE_FACTOR1 1.0f
+#define DISTANCE_FACTOR2 1.0f
+
+float genome_distance(
+    genome_t *a,
+    genome_t *b) {
+    int32_t ahighest_innovation = a->connections.get(a->connections.connection_count - 1)->innovation_number;
+    int32_t bhighest_innovation = b->connections.get(b->connections.connection_count - 1)->innovation_number;
+
+    if (ahighest_innovation < bhighest_innovation) {
+        genome_t *c = a;
+        a = b;
+        b = c;
+    }
+
+    int32_t aindex;
+    int32_t bindex;
+
+    int32_t disjoint_count = 0;
+    int32_t excess_count = 0;
+    float weight_diff = 0.0f;
+    float similar_genes = 0.0f;
+
+    while(
+        aindex < a->connections.connection_count &&
+        bindex < b->connections.connection_count) {
+        gene_connection_t *a_connection = a->connections.get(aindex);
+        gene_connection_t *b_connection = b->connections.get(bindex);
+
+        uint32_t ainnovation_number = a_connection->innovation_number;
+        uint32_t binnovation_number = b_connection->innovation_number;
+
+        if (ainnovation_number == binnovation_number) {
+            similar_genes += 1.0f;
+            weight_diff += fabs(a_connection->weight - b_connection->weight);
+
+            ++aindex;
+            ++bindex;
+        }
+        else if (ainnovation_number < binnovation_number) {
+            ++disjoint_count;
+            ++bindex;
+        }
+        else {
+            ++disjoint_count;
+            ++aindex;
+        }
+    }
+
+    weight_diff /= similar_genes;
+    excess_count = a->connections.connection_count - aindex;
+
+    float n = MAX(a->connections.connection_count, b->connections.connection_count);
+    if (n < 20.0f) {
+        n = 1.0f;
+    }
+
+    return (float)disjoint_count * DISTANCE_FACTOR0 / n + (float)excess_count * DISTANCE_FACTOR1 / n + weight_diff * DISTANCE_FACTOR2;
+}
+
+genome_t genome_crossover(
+    neat_t *neat,
+    genome_t *a,
+    genome_t *b) {
+    genome_t result = genome_init(neat);
+    int32_t aindex;
+    int32_t bindex;
+
+    while(
+        aindex < a->connections.connection_count &&
+        bindex < b->connections.connection_count) {
+        gene_connection_t *a_connection = a->connections.get(aindex);
+        gene_connection_t *b_connection = b->connections.get(bindex);
+
+        uint32_t ainnovation_number = a_connection->innovation_number;
+        uint32_t binnovation_number = b_connection->innovation_number;
+
+        if (ainnovation_number == binnovation_number) {
+            if (s_rand_01() > 0.5f) {
+                uint32_t index = result.connections.add_connection(
+                    a_connection->from,
+                    a_connection->to);
+                gene_connection_t *connection = result.connections.get(index);
+                memcpy(connection, a_connection, sizeof(gene_connection_t));
+            }
+            else {
+                uint32_t index = result.connections.add_connection(
+                    b_connection->from,
+                    b_connection->to);
+                gene_connection_t *connection = result.connections.get(index);
+                memcpy(connection, b_connection, sizeof(gene_connection_t));
+            }
+
+            ++aindex;
+            ++bindex;
+        }
+        else if (ainnovation_number < binnovation_number) {
+            ++bindex;
+
+            uint32_t index = result.connections.add_connection(
+                b_connection->from,
+                b_connection->to);
+            gene_connection_t *connection = result.connections.get(index);
+            memcpy(connection, b_connection, sizeof(gene_connection_t));
+        }
+        else {
+            ++aindex;
+
+            uint32_t index = result.connections.add_connection(
+                a_connection->from,
+                a_connection->to);
+            gene_connection_t *connection = result.connections.get(index);
+            memcpy(connection, a_connection, sizeof(gene_connection_t));
+        }
+    }
+
+    while(aindex < a->connections.connection_count) {
+        gene_connection_t *a_connection = a->connections.get(aindex);
+
+        uint32_t index = result.connections.add_connection(
+            a_connection->from,
+            a_connection->to);
+        gene_connection_t *connection = result.connections.get(index);
+        memcpy(connection, a_connection, sizeof(gene_connection_t));
+    }
+
+    for (uint32_t i = 0; i < result.connections.connection_count; ++i) {
+        result.genes[result.gene_count++] = result.connections.get(i)->from;
+        result.genes[result.gene_count++] = result.connections.get(i)->to;
+    }
+
+    return result;
+}
+
+void prepare_genome_for_breed(
+    neat_t *neat,
+    genome_t *a) {
+    s_sort_by_innovation_number(neat, a);
+    s_sort_by_position(neat, a);
 }

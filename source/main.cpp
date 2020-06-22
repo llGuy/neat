@@ -1,6 +1,8 @@
 #define GLEW_STATIC
 
+#include <time.h>
 #include <cstddef>
+#include <math.h>
 #include <stdint.h>
 
 #include <GL/glew.h>
@@ -84,9 +86,11 @@ void gl_end_frame() {
 int32_t main(
     int argc,
     char *argv[]) {
+    srand(time(NULL));
+
     neat = neat_init(1000, 50000);
 
-    prepare_neat(&neat, 4, 2);
+    prepare_neat(&neat, 6, 3);
 
     genome = genome_init(&neat);
 
@@ -134,7 +138,6 @@ int32_t main(
         }
 
         glEnd();
-
 
         gl_end_frame();
     }

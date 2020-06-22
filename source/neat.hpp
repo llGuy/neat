@@ -20,16 +20,48 @@ struct gene_connection_t {
 
 using connection_finder_t = hash_table_t<uint32_t, 2000, 20, 20>;
 
+struct gene_connection_tracker_t {
+    connection_finder_t *finder;
+
+    uint32_t connection_count, max_connection_count;
+    gene_connection_t *connections;
+
+    void init(
+        uint32_t max_connection_count);
+
+    // This function JUST adds a connection
+    uint32_t add_connection(
+        gene_id_t from,
+        gene_id_t to);
+
+    // This is if the connection index is known
+    uint32_t add_connection(
+        gene_id_t from,
+        gene_id_t to,
+        uint32_t connection_index);
+
+    // Returns the index of the removed connection
+    uint32_t remove_connection(
+        gene_id_t from,
+        gene_id_t to);
+
+    // If we know that it exists
+    gene_connection_t *get(
+        uint32_t index);
+
+    // If we don't know that it exists
+    gene_connection_t *fetch_gene_connection(
+        gene_id_t from,
+        gene_id_t to);
+};
+
 // Structure which holds information on ALL the genes / gene connections
 // that exist at the moment
 struct neat_t {
     uint32_t gene_count, max_gene_count;
     gene_t *genes;
 
-    uint32_t connection_count, max_connection_count;
-    gene_connection_t *connections;
-
-    connection_finder_t *connection_finder;
+    gene_connection_tracker_t connections;
 };
 
 neat_t neat_init(
@@ -49,12 +81,9 @@ gene_connection_t *fetch_gene_connection(
 struct genome_t {
     // Holds the index into the neat's genes array
     uint32_t gene_count, max_gene_count;
-    uint32_t *genes;
+    gene_id_t *genes;
 
-    uint32_t connection_count, max_connection_count;
-    gene_connection_t *connections;
-
-    connection_finder_t *connection_finder;
+    gene_connection_tracker_t connections;
 };
 
 genome_t genome_init(

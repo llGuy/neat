@@ -149,14 +149,13 @@ struct species_t {
     float average_score;
 };
 
+species_t *species_init(
+    struct neat_universe_t *neat);
+
 species_t species_init(
     uint32_t entity_count);
 
 void force_extinction(
-    species_t *species);
-
-bool add_entity(
-    neat_entity_t *entity,
     species_t *species);
 
 void score(
@@ -171,5 +170,28 @@ genome_t *breed_genomes(
 struct neat_universe_t {
     neat_t neat;
 
+    uint32_t entity_count;
     neat_entity_t *entities;
+
+    uint32_t species_count;
+    species_t *species;
 };
+
+void universe_init(
+    neat_universe_t *universe,
+    uint32_t entity_count,
+    uint32_t input_count,
+    uint32_t output_count);
+
+// To run before calculating score
+void prepare_evaluation();
+
+// Here calculate the score (this could be running the game
+// then assigning a value in terms of how good the entity performed)
+
+
+
+
+// After having calculated the scores, do some shit and evolve
+void end_evaluation_and_evolve(
+    neat_universe_t *universe);

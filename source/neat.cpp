@@ -250,6 +250,8 @@ void mutate_add_connection(
 
                 memcpy(dst, src, sizeof(gene_connection_t));
                 dst->weight = (s_rand_01() * 2.0f - 1.0f) * WEIGHT_RANDOM;
+
+                printf("New connection was created\n");
             }
 
             break;
@@ -360,6 +362,28 @@ void mutate_connection_toggle(
     connection->enabled = !connection->enabled;
 }
 
+#define MUTATION_PROBABILITY 0.4f
+
+void mutate_genome(
+    neat_t *neat,
+    genome_t *genome) {
+    if (s_rand_01() > MUTATION_PROBABILITY) {
+        mutate_add_connection(genome, neat);
+    }
+    if (s_rand_01() > MUTATION_PROBABILITY) {
+        mutate_add_gene(genome, neat);
+    }
+    if (s_rand_01() > MUTATION_PROBABILITY) {
+        mutate_shift_weight(genome, neat);
+    }
+    if (s_rand_01() > MUTATION_PROBABILITY) {
+        mutate_random_weight(genome, neat);
+    }
+    if (s_rand_01() > MUTATION_PROBABILITY) {
+        mutate_connection_toggle(genome, neat);
+    }
+}
+
 static void s_sort_by_position(
     neat_t *neat,
     genome_t *a) {
@@ -466,8 +490,8 @@ float genome_distance(
         b = c;
     }
 
-    int32_t aindex;
-    int32_t bindex;
+    int32_t aindex = 0;
+    int32_t bindex = 0;
 
     int32_t disjoint_count = 0;
     int32_t excess_count = 0;
@@ -500,7 +524,12 @@ float genome_distance(
         }
     }
 
-    weight_diff /= similar_genes;
+    if (similar_genes == 0.0f) {
+        weight_diff = 1000000.0f;
+    }
+    else {
+        weight_diff /= similar_genes;
+    }
     excess_count = a->connections.connection_count - aindex;
 
     float n = MAX(a->connections.connection_count, b->connections.connection_count);
@@ -749,6 +778,10 @@ bool add_entity(
     bool do_check,
     neat_entity_t *entity,
     species_t *species) {
+    if (species->entity_count == 0) {
+        do_check = 0;
+    }
+
     // Representative is just the first one
     if (do_check) {
         if (genome_distance(&entity->genome, &species->entities[0]->genome) < 4.0f) {
@@ -802,41 +835,45 @@ void reset_species(
 void eliminate_weakest(
     species_t *species) {
     // Need to sort in terms of the score
-    for (uint32_t i = 0; i < species->entity_count - 1; ++i) {
-        neat_entity_t *a = species->entities[i];
-        neat_entity_t *b = species->entities[i + 1];
+    if (species->entity_count > 1) {
+        for (uint32_t i = 0; i < species->entity_count - 1; ++i) {
+            neat_entity_t *a = species->entities[i];
+            neat_entity_t *b = species->entities[i + 1];
 
-        if (a->score > b->score) {
-            neat_entity_t *tmp = a;
-            species->entities[i] = b;
-            species->entities[i + 1] = tmp;
+            if (a->score > b->score) {
+                neat_entity_t *tmp = a;
+                species->entities[i] = b;
+                species->entities[i + 1] = tmp;
 
-            // Problem, need to switch
-            for (uint32_t j = i - 1; j >= 0; ++j) {
-                a = species->entities[j];
-                b = species->entities[j + 1];
+                // Problem, need to switch
+                for (uint32_t j = i - 1; j >= 0; ++j) {
+                    a = species->entities[j];
+                    b = species->entities[j + 1];
         
-                if (a->score > b->score) {
-                    tmp = a;
-                    species->entities[j] = b;
-                    species->entities[j + 1] = tmp;
-                }
-                else {
-                    break;
-                }
-            } 
+                    if (a->score > b->score) {
+                        tmp = a;
+                        species->entities[j] = b;
+                        species->entities[j + 1] = tmp;
+                    }
+                    else {
+                        break;
+                    }
+                } 
+            }
         }
+
+        for (uint32_t i = 0; i < species->entity_count / 2; ++i) {
+            neat_entity_t *entity = species->entities[i];
+
+            if (i < species->entity_count - 1) {
+                // Remove this entity
+                uint32_t opposing = species->entity_count - i - 1;
+                species->entities[i] = species->entities[opposing];
+            }
+        }
+
+        species->entity_count -= species->entity_count / 2;
     }
-
-    for (uint32_t i = 0; i < species->entity_count / 2; ++i) {
-        neat_entity_t *entity = species->entities[i];
-
-        // Remove this entity
-        uint32_t opposing = species->entity_count - i - 1;
-        species->entities[i] = species->entities[opposing];
-    }
-
-    species->entity_count -= species->entity_count / 2;
 }
 
 genome_t breed_genomes(
@@ -858,5 +895,129 @@ genome_t breed_genomes(
     }
     else {
         return genome_crossover(neat, &b->genome, &a->genome);
+    }
+}
+
+// UNIVERSE CODE //////////////////////////////////////////////////////////////
+void universe_init(
+    neat_universe_t *universe,
+    uint32_t entity_count,
+    uint32_t input_count,
+    uint32_t output_count) {
+    universe->neat = neat_init(500, 5000);
+    prepare_neat(&universe->neat, input_count, output_count);
+
+    universe->species_count = 0;
+    universe->species = (species_t *)malloc(sizeof(species_t) * entity_count);
+    // ^ Maximum amount of species
+
+    universe->entity_count = entity_count;
+    universe->entities = (neat_entity_t *)malloc(sizeof(neat_entity_t) * entity_count);
+
+    for (uint32_t i = 0; i < universe->entity_count; ++i) {
+        neat_entity_t *entity = &universe->entities[i];
+
+        entity->score = 0.0f;
+        entity->genome = genome_init(&universe->neat);
+        entity->species = NULL;
+
+        mutate_add_connection(&entity->genome , &universe->neat);
+    }
+}
+
+species_t *species_init(
+    struct neat_universe_t *universe) {
+    species_t *species = &universe->species[universe->species_count++];
+    species->average_score = 0.0f;
+    species->entity_count = 0;
+    species->entities = (neat_entity_t **)malloc(sizeof(neat_entity_t *) * universe->entity_count);
+
+    return species;
+}
+
+// When evolving:
+
+// - create the species
+// --- Reset all the species
+// --- for each client - check if it's not the representative of a species, otherwise, add it to a species it's similar to
+// --- If it wasn't added to a species, create a new species and make this client the representative
+// --- Calculate the scores of the species
+
+// - kill the weakest
+// --- Kills 50% (make a variable) of the population (for each species)
+
+// - delete the extinct ones
+// --- Iterate through each species
+// --- If there are no clients in there, remove it (or if there is only one left)
+
+// - reproduce
+// --- Iterate through all the clients - check if it has been killed - if it has, set it to a new one
+//     created from breeding a random species and assign it to that species (with do_check = false)
+
+// - mutate
+// --- Iterate through all clients and mutate each one
+void end_evaluation_and_evolve(
+    neat_universe_t *universe) {
+    // This will select a new representative
+    for (uint32_t i = 0; i < universe->species_count; ++i) {
+        reset_species(&universe->species[i]);
+    }
+
+    for (uint32_t i = 0; i < universe->entity_count; ++i) {
+        neat_entity_t *entity = &universe->entities[i];
+
+        // If it's not the representative of the species
+        if (!entity->species) {
+            bool added_to_species = 0;
+            for (uint32_t j = 0; j < universe->species_count; ++j) {
+                if (add_entity(1, entity, &universe->species[j])) {
+                    added_to_species = 1;
+                    break;
+                }
+            }
+
+            if (!added_to_species) {
+                // Create a new species
+                species_t *species = species_init(universe);
+                add_entity(0, entity, species);
+            }
+        }
+    }
+
+    for (uint32_t i = 0; i < universe->species_count; ++i) {
+        eliminate_weakest(&universe->species[i]);
+    }
+
+    uint32_t eliminated_species = 0;
+    for (uint32_t i = 0; i < universe->species_count; ++i) {
+        if (universe->species[i].entity_count <= 1) {
+            if (i < universe->species_count - 1) {
+                // Eliminate this species (by swapping)
+                uint32_t opposing = universe->species_count - i - 1;
+                universe->species[i] = universe->species[opposing];
+            }
+
+            ++eliminated_species;
+        }
+    }
+
+    universe->species_count -= eliminated_species;
+
+    for (uint32_t i = 0; i < universe->entity_count; ++i) {
+        neat_entity_t *entity = &universe->entities[i];
+
+        if (entity->species == NULL) {
+            // Get a random species and breed!
+            uint32_t index = rand() % universe->species_count;
+            species_t *species = &universe->species[index];
+
+            entity->genome = breed_genomes(&universe->neat, species);
+            add_entity(0, entity, species);
+        }
+    }
+
+    // Mutate all the entities now
+    for (uint32_t i = 0; i < universe->entity_count; ++i) {
+        mutate_genome(&universe->neat, &universe->entities[i].genome);
     }
 }

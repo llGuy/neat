@@ -10,6 +10,8 @@
 
 #include "neat.hpp"
 
+static neat_universe_t universe;
+
 static neat_t neat;
 static genome_t genome;
 
@@ -90,14 +92,22 @@ int32_t main(
 
     srand(time(NULL));
 
+    // Test
     neat = neat_init(1000, 50000);
-
     prepare_neat(&neat, 6, 3);
-
     genome = genome_init(&neat);
 
-    // mutate_add_connection(&genome, &neat);
-    // mutate_add_connection(&genome, &neat);
+    // Actual
+    universe_init(&universe, 20, 4, 2);
+    for (uint32_t i = 0; i < universe.entity_count; ++i) {
+        universe.entities[i].score = 10;
+    }
+
+    end_evaluation_and_evolve(&universe);
+
+    for (uint32_t i = 0; i < universe.entity_count; ++i) {
+        universe.entities[i].score = 10;
+    }
 
     gl_context_init();
 

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include "hash_table.hpp"
 
+void neat_module_init();
+
 struct gene_t {
     uint32_t x;
     // y variable just used for display
@@ -131,3 +133,34 @@ void mutate_connection_toggle(
 float genome_distance(
     genome_t *a,
     genome_t *b);
+
+struct neat_entity_t {
+    float score;
+    genome_t genome;
+
+    struct species_t *species;
+};
+
+struct species_t {
+    // That are of the same species
+    neat_entity_t **entities;
+    uint32_t entity_count;
+
+    float average_score;
+};
+
+species_t species_init(
+    uint32_t entity_count);
+
+void force_extinction(
+    species_t *species);
+
+bool add_entity(
+    neat_entity_t *entity,
+    species_t *species);
+
+void score(
+    species_t *species);
+
+void eliminate_weakest(
+    species_t *species);

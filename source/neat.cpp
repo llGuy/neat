@@ -737,3 +737,69 @@ void run_genome(
         node->current_value = s_activation_function(node->current_value);
     }
 }
+
+void neat_module_init() {
+    dummy_connections = (connection_t *)malloc(sizeof(connection_t) * 50000);
+    dummy_nodes = (node_t *)malloc(sizeof(node_t) * 10000);
+    node_indices = (uint32_t *)malloc(sizeof(uint32_t) * 10000);
+    finder.init();
+}
+
+bool add_entity(
+    bool do_check,
+    neat_entity_t *entity,
+    species_t *species) {
+    // Representative is just the first one
+    if (do_check) {
+        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 4.0f) {
+            species->entities[species->entity_count++] = entity;
+            entity->species = species;
+            return true;
+        }
+
+        return false;
+    }
+    else {
+        species->entities[species->entity_count++] = entity;
+            entity->species = species;
+        return true;
+    }
+}
+
+void force_extinction(
+    species_t *species) {
+    for (uint32_t i = 0; i < species->entity_count; ++i) {
+        species->entities[i]->species= NULL;
+    }
+}
+
+void score(
+    species_t *species) {
+    float total = 0.0f;
+    for (uint32_t i = 0; i < species->entity_count; ++i) {
+        total += species->entities[i]->score;
+    }
+
+    species->average_score = total / (float)species->entity_count;
+}
+
+void reset_species(
+    species_t *species) {
+    for (uint32_t i = 0; i < species->entity_count; ++i) {
+        species->entities[i]->species = NULL;
+    }
+
+    neat_entity_t *random_entity = species->entities[rand() % species->entity_count];
+
+    species->entity_count = 1;
+
+    species->entities[0] = random_entity;
+    random_entity->species = species;
+
+    species->average_score = 0.0f;
+}
+
+void eliminate_weakest(
+    species_t *species) {
+    
+}

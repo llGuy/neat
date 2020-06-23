@@ -86,6 +86,8 @@ void gl_end_frame() {
 int32_t main(
     int argc,
     char *argv[]) {
+    neat_module_init();
+
     srand(time(NULL));
 
     neat = neat_init(1000, 50000);

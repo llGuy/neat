@@ -406,7 +406,7 @@ static void s_sort_by_position(
             a->connections.connections_by_position[i + 1] = tmp;
 
             // Problem, need to switch
-            for (uint32_t j = i - 1; j >= 0; ++j) {
+            for (int32_t j = i - 1; j >= 0; ++j) {
                 current_index = a->connections.connections_by_position[j];
                 next_index = a->connections.connections_by_position[j + 1];
 
@@ -451,7 +451,7 @@ static void s_sort_by_innovation_number(
             a->connections.connections_by_innovation_number[i + 1] = tmp;
 
             // Problem, need to switch
-            for (uint32_t j = i - 1; j >= 0; ++j) {
+            for (int32_t j = i - 1; j >= 0; ++j) {
                 current_index = a->connections.connections_by_innovation_number[j];
                 next_index = a->connections.connections_by_innovation_number[j + 1];
 
@@ -547,8 +547,8 @@ genome_t genome_crossover(
     genome_t *a,
     genome_t *b) {
     genome_t result = genome_init(neat);
-    int32_t aindex;
-    int32_t bindex;
+    int32_t aindex = 0;
+    int32_t bindex = 0;
 
     while(
         aindex < a->connections.connection_count &&
@@ -617,12 +617,12 @@ genome_t genome_crossover(
 
         uint32_t *p = duplication_avoider.get(from);
 
-        if (p) {
+        if (!p) {
             result.genes[result.gene_count++] = from;
         }
 
         p = duplication_avoider.get(to);
-        if (p) {
+        if (!p) {
             result.genes[result.gene_count++] = to;
         }
     }
@@ -721,7 +721,7 @@ void run_genome(
             node_indices[i + 1] = tmp;
 
             // Problem, need to switch
-            for (uint32_t j = i - 1; j >= 0; ++j) {
+            for (int32_t j = i - 1; j >= 0; ++j) {
                 current_node_index = node_indices[j];
                 current_x = dummy_nodes[current_node_index].x;
 
@@ -846,7 +846,7 @@ void eliminate_weakest(
                 species->entities[i + 1] = tmp;
 
                 // Problem, need to switch
-                for (uint32_t j = i - 1; j >= 0; ++j) {
+                for (int32_t j = i - 1; j >= 0; ++j) {
                     a = species->entities[j];
                     b = species->entities[j + 1];
         
@@ -862,14 +862,19 @@ void eliminate_weakest(
             }
         }
 
+        uint32_t removed_count = 0;
         for (uint32_t i = 0; i < species->entity_count / 2; ++i) {
             neat_entity_t *entity = species->entities[i];
 
+            entity->species = NULL;
+
             if (i < species->entity_count - 1) {
                 // Remove this entity
-                uint32_t opposing = species->entity_count - i - 1;
+                uint32_t opposing = species->entity_count - removed_count - 1;
                 species->entities[i] = species->entities[opposing];
             }
+
+            ++removed_count;
         }
 
         species->entity_count -= species->entity_count / 2;
@@ -985,15 +990,23 @@ void end_evaluation_and_evolve(
     }
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
+        score(&universe->species[i]);
+    }
+
+    for (uint32_t i = 0; i < universe->species_count; ++i) {
         eliminate_weakest(&universe->species[i]);
     }
 
     uint32_t eliminated_species = 0;
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         if (universe->species[i].entity_count <= 1) {
-            if (i < universe->species_count - 1) {
+            for (uint32_t e = 0; e < universe->species[i].entity_count; ++e) {
+                universe->species[i].entities[e]->species = NULL;
+            }
+
+            if (i < universe->species_count - eliminated_species - 1) {
                 // Eliminate this species (by swapping)
-                uint32_t opposing = universe->species_count - i - 1;
+                uint32_t opposing = universe->species_count - eliminated_species - 1;
                 universe->species[i] = universe->species[opposing];
             }
 

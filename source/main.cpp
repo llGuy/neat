@@ -100,13 +100,13 @@ int32_t main(
     // Actual
     universe_init(&universe, 20, 4, 2);
     for (uint32_t i = 0; i < universe.entity_count; ++i) {
-        universe.entities[i].score = 10;
+        universe.entities[i].score = i;
     }
 
     end_evaluation_and_evolve(&universe);
 
     for (uint32_t i = 0; i < universe.entity_count; ++i) {
-        universe.entities[i].score = 10;
+        universe.entities[i].score = universe.entity_count - i;
     }
 
     gl_context_init();

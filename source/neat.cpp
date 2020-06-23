@@ -511,6 +511,8 @@ float genome_distance(
     return (float)disjoint_count * DISTANCE_FACTOR0 / n + (float)excess_count * DISTANCE_FACTOR1 / n + weight_diff * DISTANCE_FACTOR2;
 }
 
+static connection_finder_t duplication_avoider;
+
 genome_t genome_crossover(
     neat_t *neat,
     genome_t *a,
@@ -577,10 +579,23 @@ genome_t genome_crossover(
         memcpy(connection, a_connection, sizeof(gene_connection_t));
     }
 
+    duplication_avoider.clear();
+
     // TODO: This won't work - there would be duplication issues - need to resolve now
     for (uint32_t i = 0; i < result.connections.connection_count; ++i) {
-        result.genes[result.gene_count++] = result.connections.get(i)->from;
-        result.genes[result.gene_count++] = result.connections.get(i)->to;
+        uint32_t from = result.connections.get(i)->from;
+        uint32_t to = result.connections.get(i)->to;
+
+        uint32_t *p = duplication_avoider.get(from);
+
+        if (p) {
+            result.genes[result.gene_count++] = from;
+        }
+
+        p = duplication_avoider.get(to);
+        if (p) {
+            result.genes[result.gene_count++] = to;
+        }
     }
 
     return result;

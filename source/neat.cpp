@@ -801,5 +801,62 @@ void reset_species(
 
 void eliminate_weakest(
     species_t *species) {
-    
+    // Need to sort in terms of the score
+    for (uint32_t i = 0; i < species->entity_count - 1; ++i) {
+        neat_entity_t *a = species->entities[i];
+        neat_entity_t *b = species->entities[i + 1];
+
+        if (a->score > b->score) {
+            neat_entity_t *tmp = a;
+            species->entities[i] = b;
+            species->entities[i + 1] = tmp;
+
+            // Problem, need to switch
+            for (uint32_t j = i - 1; j >= 0; ++j) {
+                a = species->entities[j];
+                b = species->entities[j + 1];
+        
+                if (a->score > b->score) {
+                    tmp = a;
+                    species->entities[j] = b;
+                    species->entities[j + 1] = tmp;
+                }
+                else {
+                    break;
+                }
+            } 
+        }
+    }
+
+    for (uint32_t i = 0; i < species->entity_count / 2; ++i) {
+        neat_entity_t *entity = species->entities[i];
+
+        // Remove this entity
+        uint32_t opposing = species->entity_count - i - 1;
+        species->entities[i] = species->entities[opposing];
+    }
+
+    species->entity_count -= species->entity_count / 2;
+}
+
+genome_t breed_genomes(
+    neat_t *neat,
+    species_t *species) {
+    uint32_t first = rand() % species->entity_count;
+    neat_entity_t *a = species->entities[first];
+
+    uint32_t other = rand() % species->entity_count;
+
+    while (other == first) {
+        other = rand() % species->entity_count;
+    }
+
+    neat_entity_t *b = species->entities[other];
+
+    if (a->score > b->score) {
+        return genome_crossover(neat, &a->genome, &b->genome);
+    }
+    else {
+        return genome_crossover(neat, &b->genome, &a->genome);
+    }
 }

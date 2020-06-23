@@ -164,3 +164,12 @@ void score(
 
 void eliminate_weakest(
     species_t *species);
+
+genome_t *breed_genomes(
+    species_t *species);
+
+struct neat_universe_t {
+    neat_t neat;
+
+    neat_entity_t *entities;
+};

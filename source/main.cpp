@@ -25,6 +25,8 @@ struct bird_t {
     float distance = 0.0f;
 };
 
+bool to_break = 0;
+
 static struct {
     neat_universe_t universe;
 
@@ -45,6 +47,10 @@ static struct {
     int32_t behind_pipe;
 
     uint32_t generation;
+
+    // Either render game or render ethe genomes
+    bool rendering_game;
+    uint32_t displayed_genome;
 } game;
 
 static float s_rand_01() {
@@ -149,6 +155,10 @@ static void s_update_game() {
     }
 
     if (dead_bird_count == game.bird_count) {
+        if (to_break) {
+            printf("BREAMING\n");
+        }
+
         printf("Evolving...\n");
 
         end_evaluation_and_evolve(&game.universe);
@@ -161,8 +171,8 @@ static void s_update_game() {
 
         for (uint32_t i = 0; i < game.bird_count; ++i) {
             game.birds[i].score = 0.0f;
-            game.birds[i].current_y = 0.0f;
-            game.birds[i].shade = 1.0f;
+            game.birds[i].current_y = ((float)i / (float)game.bird_count) * 1.6f - 1.0f;
+            game.birds[i].shade = ((float)i / (float)game.bird_count) * 0.8f + 0.1f;
             game.birds[i].velocity_y = 0.0f;
             game.birds[i].dead = 0;
             game.birds[i].distance = 0.0f;
@@ -178,44 +188,87 @@ static void s_update_game() {
 }
 
 static void s_render_game() {
-    glBegin(GL_LINES);
-    for (uint32_t i = 0; i < 4; ++i) {
+    if (game.rendering_game) {
+        glBegin(GL_LINES);
+        for (uint32_t i = 0; i < 4; ++i) {
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+            glVertex2f(game.pipe_positions[i], 1.0f);
+            glVertex2f(game.pipe_positions[i], game.opening_centres[i] + game.pipe_opening_size / 2.0f);
+
+            glVertex2f(game.pipe_positions[i], -1.0f);
+            glVertex2f(game.pipe_positions[i], game.opening_centres[i] - game.pipe_opening_size / 2.0f);
+        }
+        glEnd();
+
+        glBegin(GL_POINTS);
+        for (uint32_t i = 0; i < game.bird_count; ++i) {
+            bird_t *bird = &game.birds[i];
+            if (!bird->dead) {
+                glColor4f(bird->shade, bird->shade, bird->shade, bird->shade);
+                glVertex2f(BIRD_X_POSITION, bird->current_y);
+            }
+        }
+        glEnd();
+    }
+    else {
+        glBegin(GL_LINES);
+
+        genome_t *current_genome = &game.universe.entities[game.displayed_genome].genome;
+
+        for (uint32_t i = 0; i < current_genome->connections.connection_count; ++i) {
+            gene_connection_t *connection = &current_genome->connections.connections[i];
+            gene_t *gene_from = &game.universe.neat.genes[connection->from];
+            gene_t *gene_to = &game.universe.neat.genes[connection->to];
+
+            if (connection->enabled) {
+                glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
+            }
+            else {
+                glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
+            }
+
+            float x = (float)gene_from->x / (float)game.universe.neat.max_gene_count - 0.5f;
+            float y = gene_from->y - 0.5f;
+            glVertex2f(x, y);
+            x = (float)gene_to->x / (float)game.universe.neat.max_gene_count - 0.5f;
+            y = gene_to->y - 0.5f;
+            glVertex2f(x, y);
+        }
+
+        glEnd();
+
+        glBegin(GL_POINTS);
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-        glVertex2f(game.pipe_positions[i], 1.0f);
-        glVertex2f(game.pipe_positions[i], game.opening_centres[i] + game.pipe_opening_size / 2.0f);
-
-        glVertex2f(game.pipe_positions[i], -1.0f);
-        glVertex2f(game.pipe_positions[i], game.opening_centres[i] - game.pipe_opening_size / 2.0f);
-    }
-    glEnd();
-
-    glBegin(GL_POINTS);
-    for (uint32_t i = 0; i < game.bird_count; ++i) {
-        bird_t *bird = &game.birds[i];
-        if (!bird->dead) {
-            glColor4f(bird->shade, bird->shade, bird->shade, bird->shade);
-            glVertex2f(BIRD_X_POSITION, bird->current_y);
+        for (uint32_t i = 0; i < current_genome->gene_count; ++i) {
+            gene_t *gene = &game.universe.neat.genes[current_genome->genes[i]];
+            float x = (float)gene->x / (float)game.universe.neat.max_gene_count - 0.5f;
+            glVertex2f(x, gene->y - 0.5f);
         }
+
+        glEnd();
     }
-    glEnd();
+    
 }
 
 static void s_game_init() {
     // There will be 20 birds
-    universe_init(&game.universe, 20, 4, 2);
+    universe_init(&game.universe, 15, 4, 2);
 
-    game.bird_count = 20;
+    game.bird_count = 15;
     game.generation = 0;
 
     for (uint32_t i = 0; i < game.bird_count; ++i) {
-        game.birds[i].current_y = 0.0f;
-        game.birds[i].shade = 1.0f;
+        game.birds[i].current_y = ((float)i / (float)game.bird_count) * 1.6f - 1.0f;
+        game.birds[i].shade = ((float)i / (float)game.bird_count) * 0.8f + 0.1f;
         game.birds[i].velocity_y = 0.0f;
         game.birds[i].dead = 0;
         game.birds[i].score = 0.0f;
         game.birds[i].distance = 0.0f;
     }
+
+    to_break =0 ;
 
     game.pipe_opening_size = 0.4f;
     game.pipe_distance = 0.5f;
@@ -226,6 +279,9 @@ static void s_game_init() {
         game.pipe_positions[i] = (float)i * game.pipe_distance;
         game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
     }
+
+    game.rendering_game = 1;
+    game.displayed_genome = 0;
 }
 
 static neat_universe_t universe;
@@ -267,6 +323,25 @@ static void s_window_key_callback(
         case GLFW_KEY_SPACE: {
             game.birds[0].velocity_y = 1.0f;
         } break;
+
+        case GLFW_KEY_ESCAPE: {
+            game.rendering_game = !game.rendering_game;
+        } break;
+
+        case GLFW_KEY_P: {
+            to_break = 1;
+            printf("GOING TO BREAK\n");
+        } break;
+
+        case GLFW_KEY_RIGHT: {
+            game.displayed_genome = (game.displayed_genome + 1) % game.universe.entity_count;
+            printf("Displaying genome of %d\n", game.displayed_genome);
+        } break;
+
+        case GLFW_KEY_LEFT: {
+            game.displayed_genome = (game.displayed_genome - 1) % game.universe.entity_count;
+            printf("Displaying genome of %d\n", game.displayed_genome);
+        } break;
         }
     }
 }
@@ -289,7 +364,7 @@ void gl_context_init() {
 
     running = 1;
 
-    glPointSize(20.0f);
+    glPointSize(10.0f);
 }
 
 void gl_context_terminate() {
@@ -392,7 +467,9 @@ int32_t main(
         // glEnd();
 
         s_render_game();
-        s_update_game();
+        if (game.rendering_game) {
+            s_update_game();
+        }
 
         gl_end_frame();
 

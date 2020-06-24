@@ -73,7 +73,13 @@ uint32_t gene_connection_tracker_t::remove_connection(
     gene_id_t from,
     gene_id_t to) {
     uint64_t hash = s_connection_hash(from, to);
-    uint32_t index = *(finder->get(hash));
+    uint32_t *p = finder->get(hash);
+
+    if (!p) {
+        assert(0);
+    }
+
+    uint32_t index = *(p);
 
     // Just remove the hash
     finder->remove(hash);
@@ -149,7 +155,7 @@ genome_t genome_init(
 
     genome.max_gene_count = neat->max_gene_count;
     // For the inputs and outputs
-    genome.gene_count = neat->gene_count;
+    genome.gene_count = neat->input_count + neat->output_count;
     genome.genes = (uint32_t *)malloc(
         sizeof(uint32_t) * neat->max_gene_count);
 
@@ -886,7 +892,8 @@ void eliminate_weakest(
         }
 
         uint32_t removed_count = 0;
-        for (uint32_t i = 0; i < species->entity_count / 2; ++i) {
+        uint32_t to_eliminate = (uint32_t)(0.5f * (float)species->entity_count);
+        for (uint32_t i = 0; i < to_eliminate; ++i) {
             neat_entity_t *entity = species->entities[i];
 
             entity->species = NULL;
@@ -900,7 +907,7 @@ void eliminate_weakest(
             ++removed_count;
         }
 
-        species->entity_count -= species->entity_count / 2;
+        species->entity_count -= removed_count;
     }
 }
 
@@ -1086,6 +1093,8 @@ void end_evaluation_and_evolve(
             assert(0);
         }
     }
+
+    printf("Breeding...\n");
 
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         neat_entity_t *entity = &universe->entities[i];

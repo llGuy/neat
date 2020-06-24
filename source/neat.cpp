@@ -406,7 +406,7 @@ static void s_sort_by_position(
             a->connections.connections_by_position[i + 1] = tmp;
 
             // Problem, need to switch
-            for (int32_t j = i - 1; j >= 0; ++j) {
+            for (int32_t j = i - 1; j >= 0; --j) {
                 current_index = a->connections.connections_by_position[j];
                 next_index = a->connections.connections_by_position[j + 1];
 
@@ -451,7 +451,7 @@ static void s_sort_by_innovation_number(
             a->connections.connections_by_innovation_number[i + 1] = tmp;
 
             // Problem, need to switch
-            for (int32_t j = i - 1; j >= 0; ++j) {
+            for (int32_t j = i - 1; j >= 0; --j) {
                 current_index = a->connections.connections_by_innovation_number[j];
                 next_index = a->connections.connections_by_innovation_number[j + 1];
 
@@ -688,6 +688,9 @@ void run_genome(
         if (i < neat->input_count) {
             dummy_nodes[i].current_value = inputs[i];
         }
+        else {
+            dummy_nodes[i].current_value = 0.0f;
+        }
 
         // We will sort this later according to the x values
         node_indices[i] = i;
@@ -722,7 +725,7 @@ void run_genome(
             node_indices[i + 1] = tmp;
 
             // Problem, need to switch
-            for (int32_t j = i - 1; j >= 0; ++j) {
+            for (int32_t j = i - 1; j >= 0; --j) {
                 current_node_index = node_indices[j];
                 current_x = dummy_nodes[current_node_index].x;
 
@@ -765,6 +768,14 @@ void run_genome(
         }
 
         node->current_value = s_activation_function(node->current_value);
+    }
+
+    for (uint32_t i = 0; i < neat->output_count; ++i) {
+        gene_id_t id = neat->input_count + i;
+
+        uint32_t *index = finder.get(id);
+        node_t *node = &dummy_nodes[*index];
+        outputs[i] = node->current_value;
     }
 }
 
@@ -847,7 +858,7 @@ void eliminate_weakest(
                 species->entities[i + 1] = tmp;
 
                 // Problem, need to switch
-                for (int32_t j = i - 1; j >= 0; ++j) {
+                for (int32_t j = i - 1; j >= 0; --j) {
                     a = species->entities[j];
                     b = species->entities[j + 1];
         
@@ -998,6 +1009,33 @@ void end_evaluation_and_evolve(
         eliminate_weakest(&universe->species[i]);
     }
 
+
+    for (uint32_t i = 0; i < universe->species_count - 1; ++i) {
+        species_t *a = &universe->species[i];
+        species_t *b = &universe->species[i + 1];
+
+        if (a->entity_count > b->entity_count) {
+            species_t tmp = *a;
+            universe->species[i] = *b;
+            universe->species[i + 1] = tmp;
+
+            // Problem, need to switch
+            for (int32_t j = i - 1; j >= 0; --j) {
+                a = &universe->species[j];
+                b = &universe->species[j + 1];
+        
+                if (a->entity_count > b->entity_count) {
+                    tmp = *a;
+                    universe->species[j] = *b;
+                    universe->species[j + 1] = tmp;
+                }
+                else {
+                    break;
+                }
+            } 
+        }
+    }
+
     uint32_t eliminated_species = 0;
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         if (universe->species[i].entity_count <= 1) {
@@ -1009,13 +1047,19 @@ void end_evaluation_and_evolve(
                 // Eliminate this species (by swapping)
                 uint32_t opposing = universe->species_count - eliminated_species - 1;
                 universe->species[i] = universe->species[opposing];
-            }
 
-            ++eliminated_species;
+                ++eliminated_species;
+            }
         }
     }
 
     universe->species_count -= eliminated_species;
+
+    for (uint32_t i = 0; i < universe->species_count; ++i) {
+        if (universe->species[i].entity_count <= 1) {
+            assert(0);
+        }
+    }
 
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         neat_entity_t *entity = &universe->entities[i];

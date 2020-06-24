@@ -16,6 +16,8 @@ static uint64_t s_connection_hash(
 
     uint64_t hash = u64_gene_from + (u64_gene_to << 32);
 
+    hash = gene_from * 129367 + gene_to * 98741;
+
     return hash;
 }
 
@@ -228,7 +230,7 @@ void mutate_add_connection(
                 // number will have been set if the connection has been added
                 // before (also through the memcpy)
 
-                printf("Connection was created before in the NEAT\n");
+                // printf("Connection was created before in the NEAT\n");
             }
             else {
                 // Here we need to add the connection in the NEAT
@@ -251,7 +253,7 @@ void mutate_add_connection(
                 memcpy(dst, src, sizeof(gene_connection_t));
                 dst->weight = (s_rand_01() * 2.0f - 1.0f) * WEIGHT_RANDOM;
 
-                printf("New connection was created\n");
+                // printf("New connection was created\n");
             }
 
             break;
@@ -276,7 +278,7 @@ void mutate_add_gene(
         gene_id_t new_gene_id = neat->gene_count++;
         gene_t *new_gene_ptr = &neat->genes[new_gene_id];
 
-        printf("New gene ID: %d - produced from previous connection: %d to %d\n", new_gene_id, connection->from, connection->to);
+        // printf("New gene ID: %d - produced from previous connection: %d to %d\n", new_gene_id, connection->from, connection->to);
 
         new_gene_ptr->x = middle_x;
         new_gene_ptr->y = middle_y;
@@ -606,6 +608,8 @@ genome_t genome_crossover(
             a_connection->to);
         gene_connection_t *connection = result.connections.get(index);
         memcpy(connection, a_connection, sizeof(gene_connection_t));
+
+        ++aindex;
     }
 
     duplication_avoider.clear();
@@ -617,13 +621,19 @@ genome_t genome_crossover(
 
         uint32_t *p = duplication_avoider.get(from);
 
+        if (from > neat->gene_count || to > neat->gene_count) {
+            assert(0);
+        }
+
         if (!p) {
             result.genes[result.gene_count++] = from;
+            duplication_avoider.insert(from, 0xFFFF);
         }
 
         p = duplication_avoider.get(to);
         if (!p) {
             result.genes[result.gene_count++] = to;
+            duplication_avoider.insert(to, 0xFFFF);
         }
     }
 
@@ -784,6 +794,7 @@ void neat_module_init() {
     dummy_nodes = (node_t *)malloc(sizeof(node_t) * 10000);
     node_indices = (uint32_t *)malloc(sizeof(uint32_t) * 10000);
     finder.init();
+    duplication_avoider.init();
 }
 
 bool add_entity(
@@ -796,7 +807,7 @@ bool add_entity(
 
     // Representative is just the first one
     if (do_check) {
-        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 4.0f) {
+        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 6.0f) {
             species->entities[species->entity_count++] = entity;
             entity->species = species;
             return true;
@@ -980,6 +991,8 @@ void end_evaluation_and_evolve(
         reset_species(&universe->species[i]);
     }
 
+    uint32_t representatives = 0;
+
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         neat_entity_t *entity = &universe->entities[i];
 
@@ -999,6 +1012,17 @@ void end_evaluation_and_evolve(
                 add_entity(0, entity, species);
             }
         }
+        else {
+            representatives++;
+        }
+    }
+
+    printf("There were %d representatives\n", representatives);
+
+    printf("Created %d species\n", universe->species_count);
+
+    for (uint32_t i = 0; i < universe->species_count; ++i) {
+        printf("Species %d has %d entities\n", i, universe->species[i].entity_count);
     }
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
@@ -1014,7 +1038,7 @@ void end_evaluation_and_evolve(
         species_t *a = &universe->species[i];
         species_t *b = &universe->species[i + 1];
 
-        if (a->entity_count > b->entity_count) {
+        if (a->entity_count < b->entity_count) {
             species_t tmp = *a;
             universe->species[i] = *b;
             universe->species[i + 1] = tmp;
@@ -1024,7 +1048,7 @@ void end_evaluation_and_evolve(
                 a = &universe->species[j];
                 b = &universe->species[j + 1];
         
-                if (a->entity_count > b->entity_count) {
+                if (a->entity_count < b->entity_count) {
                     tmp = *a;
                     universe->species[j] = *b;
                     universe->species[j + 1] = tmp;
@@ -1037,23 +1061,25 @@ void end_evaluation_and_evolve(
     }
 
     uint32_t eliminated_species = 0;
-    for (uint32_t i = 0; i < universe->species_count; ++i) {
+    uint32_t i = 0;
+    for (; i < universe->species_count; ++i) {
         if (universe->species[i].entity_count <= 1) {
-            for (uint32_t e = 0; e < universe->species[i].entity_count; ++e) {
-                universe->species[i].entities[e]->species = NULL;
-            }
+            break;
+        }
+    }
 
-            if (i < universe->species_count - eliminated_species - 1) {
-                // Eliminate this species (by swapping)
-                uint32_t opposing = universe->species_count - eliminated_species - 1;
-                universe->species[i] = universe->species[opposing];
-
-                ++eliminated_species;
-            }
+    for (; i < universe->species_count; ++i) {
+        for (uint32_t e = 0; e < universe->species[i].entity_count; ++e) {
+            universe->species[i].entities[e]->species = NULL;
+            ++eliminated_species;
         }
     }
 
     universe->species_count -= eliminated_species;
+
+    if (universe->species_count == 0) {
+        assert(0);
+    }
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         if (universe->species[i].entity_count <= 1) {

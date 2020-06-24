@@ -12,6 +12,7 @@ template <
     uint32_t Bucket_Search_Count> struct hash_table_t {
     enum : uint64_t { UNINITIALISED_HASH = 0xFFFFFFFFFFFFFFFF };
     enum { ITEM_POUR_LIMIT    = Bucket_Search_Count };
+    enum { BUCKET_SIZE = Bucket_Count };
 
     struct item_t {
         uint64_t hash = UNINITIALISED_HASH;
@@ -54,12 +55,20 @@ template <
         T value) {
         bucket_t *bucket = &buckets[hash % (uint64_t)Bucket_Count];
 
+        //printf("Adding to bucket: %d\n", hash % (uint64_t)Bucket_Count);
+
         for (uint32_t bucket_item = 0; bucket_item < Bucket_Size; ++bucket_item) {
             item_t *item = &bucket->items[bucket_item];
             if (item->hash == UNINITIALISED_HASH) {
                 /* found a slot for the object */
                 item->hash = hash;
                 item->value = value;
+                return;
+            }
+
+            if (item->hash == hash) {
+                // ALREADY ADDED THIS SHIT
+                // printf("Already added this\n");
                 return;
             }
         }

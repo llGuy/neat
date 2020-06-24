@@ -20,7 +20,7 @@ struct gene_connection_t {
     float weight;
 };
 
-using connection_finder_t = hash_table_t<uint32_t, 10000, 40, 20>;
+using connection_finder_t = hash_table_t<uint32_t, 100, 40, 40>;
 
 struct gene_connection_tracker_t {
     connection_finder_t *finder;

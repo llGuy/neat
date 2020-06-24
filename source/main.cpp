@@ -10,6 +10,71 @@
 
 #include "neat.hpp"
 
+struct bird_t {
+    uint32_t neat_entity_index;
+
+    // Each bird will have a different color (shade of gray or something)
+    float shade;
+
+    float current_y;
+    float velocity_y;
+};
+
+static struct {
+    // neat_universe_t universe;
+    bird_t bird;
+
+    // Distance between the pipes
+    float pipe_distance;
+    float pipe_opening_size;
+
+    // Always 4 pipes at a time
+    float pipe_positions[4];
+    float opening_centres[4];
+} game;
+
+static float s_rand_01() {
+    return (float)(rand()) / (float)(RAND_MAX);
+}
+
+static void s_update_game() {
+    for (uint32_t i = 0; i < 4; ++i) {
+        game.pipe_positions[i] -= 0.001f;
+
+        if (game.pipe_positions[i] <= -1.0f) {
+            game.pipe_positions[i] = 1.0f;
+            game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
+        }
+    }
+}
+
+static void s_render_game() {
+    glBegin(GL_LINES);
+    for (uint32_t i = 0; i < 4; ++i) {
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+        glVertex2f(game.pipe_positions[i], 1.0f);
+        glVertex2f(game.pipe_positions[i], game.opening_centres[i] + game.pipe_opening_size / 2.0f);
+
+        glVertex2f(game.pipe_positions[i], -1.0f);
+        glVertex2f(game.pipe_positions[i], game.opening_centres[i] - game.pipe_opening_size / 2.0f);
+    }
+    glEnd();
+}
+
+static void s_game_init() {
+    // There will be 20 birds
+    // universe_init(&game.universe, 20, 4, 2);
+
+    game.pipe_opening_size = 0.3f;
+    game.pipe_distance = 0.5f;
+
+    for (uint32_t i = 0; i < 4; ++i) {
+        game.pipe_positions[i] = (float)i * game.pipe_distance;
+        game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
+    }
+}
+
 static neat_universe_t universe;
 
 static neat_t neat;
@@ -92,75 +157,81 @@ int32_t main(
 
     srand(time(NULL));
 
+
     // Test
-    neat = neat_init(1000, 50000);
-    prepare_neat(&neat, 6, 3);
-    genome = genome_init(&neat);
+    // neat = neat_init(1000, 50000);
+    // prepare_neat(&neat, 6, 3);
+    // genome = genome_init(&neat);
 
-    // Actual
-    universe_init(&universe, 20, 4, 2);
+    // // Actual
+    // universe_init(&universe, 20, 4, 2);
 
-    float inputs[] = { 1.0f, 0.0f, 3.0f, 0.0f, -1.0f, 2.0f };
-    float outputs[] = { 0.0f, 0.0f, 0.0f };
+    // float inputs[] = { 1.0f, 0.0f, 3.0f, 0.0f, -1.0f, 2.0f };
+    // float outputs[] = { 0.0f, 0.0f, 0.0f };
 
-    for (uint32_t i = 0; i < universe.entity_count; ++i) {
-       run_genome(&universe.neat, &universe.entities[i].genome, inputs, outputs);
+    // for (uint32_t i = 0; i < universe.entity_count; ++i) {
+    //    run_genome(&universe.neat, &universe.entities[i].genome, inputs, outputs);
 
-        if (outputs[0] > outputs[1] && outputs[0] > outputs[2]) {
-            universe.entities[i].score = 10.0f;
-        }
-        else {
-            universe.entities[i].score = 0.0f;
-        }
-    }
+    //     if (outputs[0] > outputs[1] && outputs[0] > outputs[2]) {
+    //         universe.entities[i].score = 10.0f;
+    //     }
+    //     else {
+    //         universe.entities[i].score = 0.0f;
+    //     }
+    // }
 
-    end_evaluation_and_evolve(&universe);
+    // end_evaluation_and_evolve(&universe);
 
-    for (uint32_t i = 0; i < universe.entity_count; ++i) {
-        universe.entities[i].score = universe.entity_count - i;
-    }
+    // for (uint32_t i = 0; i < universe.entity_count; ++i) {
+    //     universe.entities[i].score = universe.entity_count - i;
+    // }
 
     gl_context_init();
+
+    s_game_init();
 
     while(running) {
         gl_begin_frame();
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glBegin(GL_LINES);
+        // glBegin(GL_LINES);
 
-        for (uint32_t i = 0; i < genome.connections.connection_count; ++i) {
-            gene_connection_t *connection = &genome.connections.connections[i];
-            gene_t *gene_from = &neat.genes[connection->from];
-            gene_t *gene_to = &neat.genes[connection->to];
+        // for (uint32_t i = 0; i < genome.connections.connection_count; ++i) {
+        //     gene_connection_t *connection = &genome.connections.connections[i];
+        //     gene_t *gene_from = &neat.genes[connection->from];
+        //     gene_t *gene_to = &neat.genes[connection->to];
 
-            if (connection->enabled) {
-                glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
-            }
-            else {
-                glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
-            }
+        //     if (connection->enabled) {
+        //         glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
+        //     }
+        //     else {
+        //         glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
+        //     }
 
-            float x = (float)gene_from->x / (float)neat.max_gene_count - 0.5f;
-            float y = gene_from->y - 0.5f;
-            glVertex2f(x, y);
-            x = (float)gene_to->x / (float)neat.max_gene_count - 0.5f;
-            y = gene_to->y - 0.5f;
-            glVertex2f(x, y);
-        }
+        //     float x = (float)gene_from->x / (float)neat.max_gene_count - 0.5f;
+        //     float y = gene_from->y - 0.5f;
+        //     glVertex2f(x, y);
+        //     x = (float)gene_to->x / (float)neat.max_gene_count - 0.5f;
+        //     y = gene_to->y - 0.5f;
+        //     glVertex2f(x, y);
+        // }
 
-        glEnd();
+        // glEnd();
 
-        glBegin(GL_POINTS);
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        // glBegin(GL_POINTS);
+        // glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-        for (uint32_t i = 0; i < genome.gene_count; ++i) {
-            gene_t *gene = &neat.genes[genome.genes[i]];
-            float x = (float)gene->x / (float)neat.max_gene_count - 0.5f;
-            glVertex2f(x, gene->y - 0.5f);
-        }
+        // for (uint32_t i = 0; i < genome.gene_count; ++i) {
+        //     gene_t *gene = &neat.genes[genome.genes[i]];
+        //     float x = (float)gene->x / (float)neat.max_gene_count - 0.5f;
+        //     glVertex2f(x, gene->y - 0.5f);
+        // }
 
-        glEnd();
+        // glEnd();
+
+        s_render_game();
+        s_update_game();
 
         gl_end_frame();
     }

@@ -704,7 +704,8 @@ void run_genome(
             assert(0);
         }
 
-        dummy_nodes[*node_index].connections[dummy_nodes->connection_count++] = i;
+        node_t *node = &dummy_nodes[*node_index];
+        node->connections[node->connection_count++] = i;
     }
 
     // Sort out in terms of the x values

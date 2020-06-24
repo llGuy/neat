@@ -99,8 +99,19 @@ int32_t main(
 
     // Actual
     universe_init(&universe, 20, 4, 2);
+
+    float inputs[] = { 1.0f, 0.0f, 3.0f, 0.0f, -1.0f, 2.0f };
+    float outputs[] = { 0.0f, 0.0f, 0.0f };
+
     for (uint32_t i = 0; i < universe.entity_count; ++i) {
-        universe.entities[i].score = i;
+       run_genome(&universe.neat, &universe.entities[i].genome, inputs, outputs);
+
+        if (outputs[0] > outputs[1] && outputs[0] > outputs[2]) {
+            universe.entities[i].score = 10.0f;
+        }
+        else {
+            universe.entities[i].score = 0.0f;
+        }
     }
 
     end_evaluation_and_evolve(&universe);

@@ -103,6 +103,8 @@ void prepare_genome_for_breed(
 
 // Has to match the number of inputs/outputs specified when creating the NEAT
 void run_genome(
+    neat_t *neat,
+    genome_t *genome,
     float *inputs,
     float *outputs);
 

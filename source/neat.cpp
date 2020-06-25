@@ -106,6 +106,34 @@ gene_connection_t *gene_connection_tracker_t::fetch_gene_connection(
     }
 }
 
+void gene_connection_tracker_t::sort_by_innovation() {
+    for (uint32_t i = 0; i < connection_count - 1; ++i) {
+        gene_connection_t *a = &connections[i];
+        gene_connection_t *b = &connections[i + 1];
+
+        if (a->innovation_number > b->innovation_number) {
+            gene_connection_t tmp = *a;
+            connections[i] = *b;
+            connections[i + 1] = tmp;
+
+            // Problem, need to switch
+            for (int32_t j = i - 1; j >= 0; --j) {
+                a = &connections[j];
+                b = &connections[j + 1];
+        
+                if (a->innovation_number > b->innovation_number) {
+                    tmp = *a;
+                    connections[j] = *b;
+                    connections[j + 1] = tmp;
+                }
+                else {
+                    break;
+                }
+            } 
+        }
+    }
+}
+
 static float s_rand_01() {
     return (float)(rand()) / (float)(RAND_MAX);
 }
@@ -370,24 +398,28 @@ void mutate_connection_toggle(
     connection->enabled = !connection->enabled;
 }
 
-#define MUTATION_PROBABILITY 0.4f
+#define MUTATION_GENE_PROBABILITY 0.5f
+#define MUTATION_CONNECTION_PROBABILITY 0.6f
+#define MUTATION_WEIGHT_SHIFT_PROBABILITY 0.7f
+#define MUTATION_WEIGHT_RANDOM_PROBABILITY 0.5f
+#define MUTATION_TOGGLE_PROBABILITY 0.25f
 
 void mutate_genome(
     neat_t *neat,
     genome_t *genome) {
-    if (s_rand_01() > MUTATION_PROBABILITY) {
+    if (s_rand_01() < MUTATION_CONNECTION_PROBABILITY) {
         mutate_add_connection(genome, neat);
     }
-    if (s_rand_01() > MUTATION_PROBABILITY) {
+    if (s_rand_01() < MUTATION_GENE_PROBABILITY) {
         mutate_add_gene(genome, neat);
     }
-    if (s_rand_01() > MUTATION_PROBABILITY) {
+    if (s_rand_01() < MUTATION_WEIGHT_SHIFT_PROBABILITY) {
         mutate_shift_weight(genome, neat);
     }
-    if (s_rand_01() > MUTATION_PROBABILITY) {
+    if (s_rand_01() < MUTATION_WEIGHT_RANDOM_PROBABILITY) {
         mutate_random_weight(genome, neat);
     }
-    if (s_rand_01() > MUTATION_PROBABILITY) {
+    if (s_rand_01() < MUTATION_TOGGLE_PROBABILITY) {
         mutate_connection_toggle(genome, neat);
     }
 }
@@ -586,7 +618,7 @@ genome_t genome_crossover(
             ++aindex;
             ++bindex;
         }
-        else if (ainnovation_number < binnovation_number) {
+        else if (ainnovation_number > binnovation_number) {
             ++bindex;
 
             uint32_t index = result.connections.add_connection(
@@ -619,6 +651,10 @@ genome_t genome_crossover(
     }
 
     duplication_avoider.clear();
+
+    for (uint32_t i = 0; i < result.gene_count; ++i) {
+        duplication_avoider.insert(result.genes[i], 0xFFFF);
+    }
 
     // TODO: This won't work - there would be duplication issues - need to resolve now
     for (uint32_t i = 0; i < result.connections.connection_count; ++i) {
@@ -813,7 +849,7 @@ bool add_entity(
 
     // Representative is just the first one
     if (do_check) {
-        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 6.0f) {
+        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 4.0f) {
             species->entities[species->entity_count++] = entity;
             entity->species = species;
             return true;
@@ -847,11 +883,20 @@ void score(
 
 void reset_species(
     species_t *species) {
+    uint32_t highest_score_index = 0;
+    float highest_score = 0.0f;
+
     for (uint32_t i = 0; i < species->entity_count; ++i) {
         species->entities[i]->species = NULL;
+
+        if (species->entities[i]->score > highest_score) {
+            highest_score_index = i;
+            highest_score = species->entities[i]->score;
+        }
     }
 
-    neat_entity_t *random_entity = species->entities[rand() % species->entity_count];
+    // neat_entity_t *random_entity = species->entities[rand() % species->entity_count];
+    neat_entity_t *random_entity = species->entities[highest_score_index];
 
     species->entity_count = 1;
 
@@ -939,7 +984,7 @@ void universe_init(
     uint32_t entity_count,
     uint32_t input_count,
     uint32_t output_count) {
-    universe->neat = neat_init(500, 5000);
+    universe->neat = neat_init(1000, 10000);
     prepare_neat(&universe->neat, input_count, output_count);
 
     universe->species_count = 0;
@@ -1002,6 +1047,8 @@ void end_evaluation_and_evolve(
 
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         neat_entity_t *entity = &universe->entities[i];
+
+        entity->genome.connections.sort_by_innovation();
 
         // If it's not the representative of the species
         if (!entity->species) {

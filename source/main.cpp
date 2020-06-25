@@ -112,7 +112,7 @@ static void s_update_game() {
 
             bird->current_y += bird->velocity_y * game.dt;
 
-            bird->distance += game.dt * 2.0;
+            bird->distance += game.dt * 0.01f;
 
             if (bird->current_y < -1.0f || bird->current_y > 1.0f) {
                 // Lost
@@ -123,28 +123,36 @@ static void s_update_game() {
                 // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
 
                 if (bird->score + bird->distance > 5.0f) {
-                    printf("Something good happened\n");
+                    printf("Something good happened to bird %d\n", i);
                 }
+
+                continue;
             }
 
-            for (uint32_t i = 0; i < 4; ++i) {
-                if (i != game.behind_pipe) {
-                    if (fabs(BIRD_X_POSITION - game.pipe_positions[i]) < 0.01f) {
+            for (uint32_t j = 0; j < 4; ++j) {
+                if (j != game.behind_pipe) {
+                    if (fabs(BIRD_X_POSITION - game.pipe_positions[j]) < 0.02f) {
                         // Check if the bird is in between the pipes
-                        if (bird->current_y < game.opening_centres[i] + game.pipe_opening_size / 2.0f &&
-                            bird->current_y > game.opening_centres[i] - game.pipe_opening_size / 2.0f) {
-                            bird->score += 10.0f;
+                        if (bird->current_y < game.opening_centres[j] + game.pipe_opening_size / 2.0f &&
+                            bird->current_y > game.opening_centres[j] - game.pipe_opening_size / 2.0f) {
+                            bird->score += 100.0f;
 
                             // printf("Score: %f\n", bird->score);
                         }
                         else {
                             bird->dead = 1;
 
+                            if (bird->score + bird->distance > 5.0f) {
+                                printf("Something good happened to bird %d\n", i);
+                            }
+
+
                             game.universe.entities[i].score = bird->score + bird->distance;
                             // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
+                            break;
                         }
 
-                        game.behind_pipe = i;
+                        game.behind_pipe = j;
                     }
                 }
             }
@@ -171,7 +179,7 @@ static void s_update_game() {
 
         for (uint32_t i = 0; i < game.bird_count; ++i) {
             game.birds[i].score = 0.0f;
-            game.birds[i].current_y = ((float)i / (float)game.bird_count) * 1.6f - 1.0f;
+            game.birds[i].current_y = ((float)i / (float)game.bird_count) * 1.6f;
             game.birds[i].shade = ((float)i / (float)game.bird_count) * 0.8f + 0.1f;
             game.birds[i].velocity_y = 0.0f;
             game.birds[i].dead = 0;
@@ -254,9 +262,9 @@ static void s_render_game() {
 
 static void s_game_init() {
     // There will be 20 birds
-    universe_init(&game.universe, 15, 4, 2);
+    universe_init(&game.universe, 25, 4, 2);
 
-    game.bird_count = 15;
+    game.bird_count = 25;
     game.generation = 0;
 
     for (uint32_t i = 0; i < game.bird_count; ++i) {

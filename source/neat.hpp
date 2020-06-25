@@ -59,6 +59,8 @@ struct gene_connection_tracker_t {
     gene_connection_t *fetch_gene_connection(
         gene_id_t from,
         gene_id_t to);
+
+    void sort_by_innovation();
 };
 
 // Structure which holds information on ALL the genes / gene connections

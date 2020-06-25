@@ -960,7 +960,7 @@ genome_t breed_genomes(
 
     uint32_t other = rand() % species->entity_count;
 
-    while (other == first) {
+    while (other == first && species->entity_count > 1) {
         other = rand() % species->entity_count;
     }
 
@@ -1032,6 +1032,9 @@ species_t *species_init(
 
 // - mutate
 // --- Iterate through all clients and mutate each one
+
+
+// PROBLEM IS PROBABLY IN THE ELIMINATION OF THE SHITTIEST GENOMES
 void end_evaluation_and_evolve(
     neat_universe_t *universe) {
     // This will select a new representative
@@ -1075,14 +1078,17 @@ void end_evaluation_and_evolve(
         printf("Species %d has %d entities\n", i, universe->species[i].entity_count);
     }
 
+    float average_score = 0.0f;
+
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         score(&universe->species[i]);
+
+        average_score += universe->species[i].average_score;
     }
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         eliminate_weakest(&universe->species[i]);
     }
-
 
     for (uint32_t i = 0; i < universe->species_count - 1; ++i) {
         species_t *a = &universe->species[i];
@@ -1132,7 +1138,7 @@ void end_evaluation_and_evolve(
     }
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
-        if (universe->species[i].entity_count <= 1) {
+        if (universe->species[i].entity_count < 1) {
             assert(0);
         }
     }

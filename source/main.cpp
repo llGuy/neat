@@ -83,6 +83,17 @@ static void s_update_game() {
 
     uint32_t dead_bird_count = 0;
 
+    bool check_pipe = 0;
+
+    for (uint32_t j = 0; j < 4; ++j) {
+        if (game.pipe_positions[j] <= BIRD_X_POSITION && game.behind_pipe != j) {
+            game.behind_pipe = j;
+            check_pipe = 1;
+
+            break;
+        }
+    }
+
     for (uint32_t i = 0; i < game.bird_count; ++i) {
         bird_t *bird = &game.birds[i];
 
@@ -129,31 +140,23 @@ static void s_update_game() {
                 continue;
             }
 
-            for (uint32_t j = 0; j < 4; ++j) {
-                if (j != game.behind_pipe) {
-                    if (fabs(BIRD_X_POSITION - game.pipe_positions[j]) < 0.02f) {
-                        // Check if the bird is in between the pipes
-                        if (bird->current_y < game.opening_centres[j] + game.pipe_opening_size / 2.0f &&
-                            bird->current_y > game.opening_centres[j] - game.pipe_opening_size / 2.0f) {
-                            bird->score += 100.0f;
 
-                            // printf("Score: %f\n", bird->score);
-                        }
-                        else {
-                            bird->dead = 1;
+            if (check_pipe) {
+                // Check if the bird is in between the pipes
+                if (bird->current_y < game.opening_centres[game.behind_pipe] + game.pipe_opening_size / 2.0f &&
+                    bird->current_y > game.opening_centres[game.behind_pipe] - game.pipe_opening_size / 2.0f) {
+                    bird->score += 100.0f;
 
-                            if (bird->score + bird->distance > 0.05f) {
-                                printf("Something good happened to bird %d\n", i);
-                            }
+                    // printf("Score: %f\n", bird->score);
+                }
+                else {
+                    bird->dead = 1;
 
-
-                            game.universe.entities[i].score = bird->score + bird->distance;
-                            // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
-                            break;
-                        }
-
-                        game.behind_pipe = j;
+                    if (bird->score + bird->distance > 0.05f) {
+                        printf("Something good happened to bird %d\n", i);
                     }
+
+                    game.universe.entities[i].score = bird->score + bird->distance;
                 }
             }
         }
@@ -189,7 +192,7 @@ static void s_update_game() {
         game.behind_pipe = 0xFFFF;
 
         for (uint32_t i = 0; i < 4; ++i) {
-            game.pipe_positions[i] = (float)i * game.pipe_distance;
+            game.pipe_positions[i] = (float)i * game.pipe_distance + 1.0f;
             game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
         }
     }
@@ -262,9 +265,9 @@ static void s_render_game() {
 
 static void s_game_init() {
     // There will be 20 birds
-    universe_init(&game.universe, 25, 4, 2);
+    universe_init(&game.universe, 35, 4, 2);
 
-    game.bird_count = 25;
+    game.bird_count = 35;
     game.generation = 0;
 
     for (uint32_t i = 0; i < game.bird_count; ++i) {
@@ -278,13 +281,13 @@ static void s_game_init() {
 
     to_break =0 ;
 
-    game.pipe_opening_size = 0.4f;
+    game.pipe_opening_size = 0.2f;
     game.pipe_distance = 0.5f;
 
     game.behind_pipe = 0xFFFF;
 
     for (uint32_t i = 0; i < 4; ++i) {
-        game.pipe_positions[i] = (float)i * game.pipe_distance;
+        game.pipe_positions[i] = (float)i * game.pipe_distance + 1.0f;
         game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
     }
 

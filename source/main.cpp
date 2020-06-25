@@ -122,7 +122,7 @@ static void s_update_game() {
 
                 // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
 
-                if (bird->score + bird->distance > 5.0f) {
+                if (bird->score + bird->distance > 0.05f) {
                     printf("Something good happened to bird %d\n", i);
                 }
 
@@ -142,7 +142,7 @@ static void s_update_game() {
                         else {
                             bird->dead = 1;
 
-                            if (bird->score + bird->distance > 5.0f) {
+                            if (bird->score + bird->distance > 0.05f) {
                                 printf("Something good happened to bird %d\n", i);
                             }
 
@@ -483,6 +483,7 @@ int32_t main(
 
         frame_time = glfwGetTime() - frame_time;
         game.dt = frame_time;
+        game.dt = 0.06f;
     }
 
     gl_context_terminate();

@@ -344,15 +344,9 @@ void mutate_add_gene(
         next_connection->weight = connection->weight;
         next_connection->innovation_number = next_connection_index;
 
-        // Just remove the connection for the genome's connection tracker
-        uint32_t removed_index = genome->connections.remove_connection(
-            connection->from,
-            connection->to);
-
         uint32_t prev_genome_index = genome->connections.add_connection(
             prev_connection->from,
-            prev_connection->to,
-            removed_index);
+            prev_connection->to);
 
         // Need to remove this gene connection
         memcpy(
@@ -368,6 +362,8 @@ void mutate_add_gene(
             genome->connections.get(next_genome_index),
             next_connection,
             sizeof(gene_connection_t));
+
+        connection->enabled = 0;
     }
 }
 
@@ -377,7 +373,7 @@ void mutate_shift_weight(
     uint32_t random_connection_id = rand() % genome->connections.connection_count;
     gene_connection_t *connection = genome->connections.get(random_connection_id);
 
-    connection->weight += (s_rand_01() * 2.0f - 1.0f) * WEIGHT_SHIFT;
+    connection->weight += (s_rand_01() * 4.0f - 2.0f) * WEIGHT_SHIFT;
 }
 
 void mutate_random_weight(
@@ -386,7 +382,7 @@ void mutate_random_weight(
     uint32_t random_connection_id = rand() % genome->connections.connection_count;
     gene_connection_t *connection = genome->connections.get(random_connection_id);
 
-    connection->weight = (s_rand_01() * 2.0f - 1.0f) * WEIGHT_RANDOM;
+    connection->weight = (s_rand_01() * 4.0f - 2.0f) * WEIGHT_RANDOM;
 }
 
 void mutate_connection_toggle(
@@ -398,10 +394,10 @@ void mutate_connection_toggle(
     connection->enabled = !connection->enabled;
 }
 
-#define MUTATION_GENE_PROBABILITY 0.5f
-#define MUTATION_CONNECTION_PROBABILITY 0.6f
-#define MUTATION_WEIGHT_SHIFT_PROBABILITY 0.7f
-#define MUTATION_WEIGHT_RANDOM_PROBABILITY 0.5f
+#define MUTATION_GENE_PROBABILITY 0.05f
+#define MUTATION_CONNECTION_PROBABILITY 0.08f
+#define MUTATION_WEIGHT_SHIFT_PROBABILITY 0.9f
+#define MUTATION_WEIGHT_RANDOM_PROBABILITY 0.1f
 #define MUTATION_TOGGLE_PROBABILITY 0.25f
 
 void mutate_genome(
@@ -516,7 +512,7 @@ static void s_sort_by_innovation_number(
 
 #define DISTANCE_FACTOR0 1.0f
 #define DISTANCE_FACTOR1 1.0f
-#define DISTANCE_FACTOR2 1.0f
+#define DISTANCE_FACTOR2 3.0f
 
 float genome_distance(
     genome_t *a,
@@ -554,7 +550,7 @@ float genome_distance(
             ++aindex;
             ++bindex;
         }
-        else if (ainnovation_number < binnovation_number) {
+        else if (ainnovation_number > binnovation_number) {
             ++disjoint_count;
             ++bindex;
         }
@@ -849,7 +845,7 @@ bool add_entity(
 
     // Representative is just the first one
     if (do_check) {
-        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 4.0f) {
+        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 3.0f) {
             species->entities[species->entity_count++] = entity;
             entity->species = species;
             return true;
@@ -895,8 +891,8 @@ void reset_species(
         }
     }
 
-    // neat_entity_t *random_entity = species->entities[rand() % species->entity_count];
-    neat_entity_t *random_entity = species->entities[highest_score_index];
+    neat_entity_t *random_entity = species->entities[rand() % species->entity_count];
+    // neat_entity_t *random_entity = species->entities[highest_score_index];
 
     species->entity_count = 1;
 

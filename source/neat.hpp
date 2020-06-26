@@ -139,6 +139,8 @@ float genome_distance(
     genome_t *b);
 
 struct neat_entity_t {
+    uint32_t id;
+
     float score;
     genome_t genome;
 
@@ -146,6 +148,8 @@ struct neat_entity_t {
 };
 
 struct species_t {
+    uint32_t id;
+
     // That are of the same species
     neat_entity_t **entities;
     uint32_t entity_count;

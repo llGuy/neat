@@ -165,7 +165,18 @@ static void s_update_game() {
         }
     }
 
+
     if (dead_bird_count == game.bird_count) {
+        uint32_t best_entity = 0;
+        float best_score = 0.0f;
+
+        for (uint32_t i = 0; i < game.bird_count; ++i) {
+            if (game.universe.entities[i].score > best_score) {
+                best_entity = i;
+                best_score = game.universe.entities[i].score;
+            }
+        }
+
         if (to_break) {
             printf("BREAMING\n");
         }
@@ -486,7 +497,7 @@ int32_t main(
 
         frame_time = glfwGetTime() - frame_time;
         game.dt = frame_time;
-        game.dt = 0.06f;
+        game.dt = 0.1f;
     }
 
     gl_context_terminate();

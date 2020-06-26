@@ -948,7 +948,12 @@ void eliminate_weakest(
             ++removed_count;
         }
 
-        species->entity_count -= removed_count;
+       species->entity_count -= removed_count;
+
+        // Now best one should be at index 0
+        for (uint32_t i = 1; i < species->entity_count; ++i) {
+            species->entities[i]->species = NULL;
+        }
     }
 }
 
@@ -996,6 +1001,7 @@ void universe_init(
         entity->score = 0.0f;
         entity->genome = genome_init(&universe->neat);
         entity->species = NULL;
+        entity->id = i;
 
         mutate_add_connection(&entity->genome , &universe->neat);
     }
@@ -1003,10 +1009,12 @@ void universe_init(
 
 species_t *species_init(
     struct neat_universe_t *universe) {
+    uint32_t id = universe->species_count;
     species_t *species = &universe->species[universe->species_count++];
     species->average_score = 0.0f;
     species->entity_count = 0;
     species->entities = (neat_entity_t **)malloc(sizeof(neat_entity_t *) * universe->entity_count);
+    species->id = id;
 
     return species;
 }
@@ -1040,6 +1048,7 @@ void end_evaluation_and_evolve(
     // This will select a new representative
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         reset_species(&universe->species[i]);
+        universe->species[i].id = i;
     }
 
     uint32_t representatives = 0;
@@ -1075,7 +1084,7 @@ void end_evaluation_and_evolve(
     printf("Created %d species\n", universe->species_count);
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
-        printf("Species %d has %d entities\n", i, universe->species[i].entity_count);
+        printf("Species %d has %d entities\n", universe->species[i].id, universe->species[i].entity_count);
     }
 
     float average_score = 0.0f;
@@ -1138,6 +1147,8 @@ void end_evaluation_and_evolve(
     }
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
+        printf("Species %d is left\n", universe->species[i].id);
+
         if (universe->species[i].entity_count < 1) {
             assert(0);
         }
@@ -1155,11 +1166,13 @@ void end_evaluation_and_evolve(
 
             entity->genome = breed_genomes(&universe->neat, species);
             add_entity(0, entity, species);
+
+            mutate_genome(&universe->neat, &universe->entities[i].genome);
         }
     }
 
     // Mutate all the entities now
-    for (uint32_t i = 0; i < universe->entity_count; ++i) {
-        mutate_genome(&universe->neat, &universe->entities[i].genome);
-    }
+    // for (uint32_t i = 0; i < universe->entity_count; ++i) {
+    //     mutate_genome(&universe->neat, &universe->entities[i].genome);
+    // }
 }

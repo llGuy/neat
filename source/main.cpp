@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "neat.hpp"
+static bool running;
 
 struct bird_t {
     uint32_t neat_entity_index;
@@ -32,7 +33,7 @@ static struct {
 
     // neat_universe_t universe;
     uint32_t bird_count;
-    bird_t birds[100];
+    bird_t birds[150];
 
     // Distance between the pipes
     float pipe_distance;
@@ -51,6 +52,8 @@ static struct {
     // Either render game or render ethe genomes
     bool rendering_game;
     uint32_t displayed_genome;
+
+    uint32_t current_bird = 0;
 } game;
 
 static float s_rand_01() {
@@ -94,79 +97,85 @@ static void s_update_game() {
         }
     }
 
-    for (uint32_t i = 0; i < game.bird_count; ++i) {
-        bird_t *bird = &game.birds[i];
+    bird_t *bird = &game.birds[game.current_bird];
 
-        if (!bird->dead) {
-            // y position of the bird, y position of the top opening, y position of the bottom opening
-            // x position of the opening
-            float inputs[4] = {
-                bird->current_y,
-                nearest_opening + game.pipe_opening_size / 2.0f,
-                nearest_opening - game.pipe_opening_size / 2.0f,
-                smallest_x
-            };
+    if (!bird->dead) {
+        // y position of the bird, y position of the top opening, y position of the bottom opening
+        // x position of the opening
+        float inputs[4] = {
+                           bird->current_y,
+                           nearest_opening + game.pipe_opening_size / 2.0f,
+                           nearest_opening - game.pipe_opening_size / 2.0f,
+                           smallest_x
+        };
 
-            float outputs[2] = {
-                0.0f, 0.0f
-            };
+        float outputs[2] = {
+                            0.0f, 0.0f
+        };
 
-            // Update
-            run_genome(&game.universe.neat, &game.universe.entities[i].genome, inputs, outputs);
+        // Update
+        run_genome(&game.universe.neat, &game.universe.entities[game.current_bird].genome, inputs, outputs);
 
-            if (outputs[0] > outputs[1]) {
-                // Jump
-                bird->velocity_y = 1.0f;
+        if (outputs[0] > outputs[1]) {
+            // Jump
+            bird->velocity_y = 1.0f;
+        }
+
+        bird->velocity_y -= game.dt * 3.0f;
+
+        bird->current_y += bird->velocity_y * game.dt;
+
+        bird->distance += game.dt * 0.01f;
+
+        if (bird->current_y < -1.0f || bird->current_y > 1.0f) {
+            // Lost
+            bird->dead = 1;
+
+            if (bird->score < 1.0f) {
+                game.universe.entities[game.current_bird].score = 0.0f;
+            }
+            else {
+                game.universe.entities[game.current_bird].score = bird->score + bird->distance;
             }
 
-            bird->velocity_y -= game.dt * 3.0f;
+            // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
 
-            bird->current_y += bird->velocity_y * game.dt;
-
-            bird->distance += game.dt * 0.01f;
-
-            if (bird->current_y < -1.0f || bird->current_y > 1.0f) {
-                // Lost
-                bird->dead = 1;
-
-                game.universe.entities[i].score = bird->score + bird->distance;
-
-                // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
-
-                if (bird->score + bird->distance > 0.05f) {
-                    printf("Something good happened to bird %d\n", i);
-                }
-
-                continue;
-            }
-
-
-            if (check_pipe) {
-                // Check if the bird is in between the pipes
-                if (bird->current_y < game.opening_centres[game.behind_pipe] + game.pipe_opening_size / 2.0f &&
-                    bird->current_y > game.opening_centres[game.behind_pipe] - game.pipe_opening_size / 2.0f) {
-                    bird->score += 100.0f;
-
-                    // printf("Score: %f\n", bird->score);
-                }
-                else {
-                    bird->dead = 1;
-
-                    if (bird->score + bird->distance > 0.05f) {
-                        printf("Something good happened to bird %d\n", i);
-                    }
-
-                    game.universe.entities[i].score = bird->score + bird->distance;
-                }
+            if (bird->score + bird->distance > 0.05f) {
+                printf("Something good happened to bird %d\n", game.current_bird);
             }
         }
-        else {
-            ++dead_bird_count;
+
+        if (check_pipe) {
+            // Check if the bird is in between the pipes
+            if (bird->current_y < game.opening_centres[game.behind_pipe] + game.pipe_opening_size / 2.0f &&
+                bird->current_y > game.opening_centres[game.behind_pipe] - game.pipe_opening_size / 2.0f) {
+                bird->score += 100.0f;
+
+                // printf("Score: %f\n", bird->score);
+            }
+            else {
+                bird->dead = 1;
+
+                if (bird->score + bird->distance > 0.05f) {
+                    printf("Something good happened to bird %d\n", game.current_bird);
+                }
+
+                game.universe.entities[game.current_bird].score = bird->score + bird->distance;
+            }
+        }
+    }
+    else {
+        game.current_bird++;
+        game.behind_pipe = 0xFFFF;
+
+        for (uint32_t i = 0; i < 4; ++i) {
+            game.pipe_positions[i] = (float)i * game.pipe_distance + 1.0f;
+            game.opening_centres[i] = (float)i / 8.0f - 0.5f;
+            // game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
         }
     }
 
-
-    if (dead_bird_count == game.bird_count) {
+    if (game.current_bird == game.bird_count) {
         uint32_t best_entity = 0;
         float best_score = 0.0f;
 
@@ -193,8 +202,8 @@ static void s_update_game() {
 
         for (uint32_t i = 0; i < game.bird_count; ++i) {
             game.birds[i].score = 0.0f;
-            game.birds[i].current_y = ((float)i / (float)game.bird_count) * 1.6f;
-            game.birds[i].shade = ((float)i / (float)game.bird_count) * 0.8f + 0.1f;
+            game.birds[i].current_y = 0.0f;
+            game.birds[i].shade = 1.0f;
             game.birds[i].velocity_y = 0.0f;
             game.birds[i].dead = 0;
             game.birds[i].distance = 0.0f;
@@ -204,8 +213,12 @@ static void s_update_game() {
 
         for (uint32_t i = 0; i < 4; ++i) {
             game.pipe_positions[i] = (float)i * game.pipe_distance + 1.0f;
-            game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
+            game.opening_centres[i] = (float)i / 4.0f - 1.0f;
+            game.opening_centres[i] = (float)i / 8.0f - 0.5f;
+            // game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
         }
+
+        game.current_bird = 0;
     }
 }
 
@@ -224,12 +237,10 @@ static void s_render_game() {
         glEnd();
 
         glBegin(GL_POINTS);
-        for (uint32_t i = 0; i < game.bird_count; ++i) {
-            bird_t *bird = &game.birds[i];
-            if (!bird->dead) {
-                glColor4f(bird->shade, bird->shade, bird->shade, bird->shade);
-                glVertex2f(BIRD_X_POSITION, bird->current_y);
-            }
+        bird_t *bird = &game.birds[game.current_bird];
+        if (!bird->dead) {
+            glColor4f(0.0f, bird->shade, 0.0f, bird->shade);
+            glVertex2f(BIRD_X_POSITION, bird->current_y);
         }
         glEnd();
     }
@@ -276,14 +287,14 @@ static void s_render_game() {
 
 static void s_game_init() {
     // There will be 20 birds
-    universe_init(&game.universe, 35, 4, 2);
+    universe_init(&game.universe, 150, 4, 2);
 
-    game.bird_count = 35;
+    game.bird_count = 150;
     game.generation = 0;
 
     for (uint32_t i = 0; i < game.bird_count; ++i) {
-        game.birds[i].current_y = ((float)i / (float)game.bird_count) * 1.6f - 1.0f;
-        game.birds[i].shade = ((float)i / (float)game.bird_count) * 0.8f + 0.1f;
+        game.birds[i].current_y = 0.0f;
+        game.birds[i].shade = 1.0f;
         game.birds[i].velocity_y = 0.0f;
         game.birds[i].dead = 0;
         game.birds[i].score = 0.0f;
@@ -300,6 +311,7 @@ static void s_game_init() {
     for (uint32_t i = 0; i < 4; ++i) {
         game.pipe_positions[i] = (float)i * game.pipe_distance + 1.0f;
         game.opening_centres[i] = s_rand_01() * 1.6f + 0.2f - 1.0f;
+        game.opening_centres[i] = (float)i / 8.0f - 0.5f;
     }
 
     game.rendering_game = 1;
@@ -312,7 +324,6 @@ static neat_t neat;
 static genome_t genome;
 
 static GLFWwindow *window;
-static bool running;
 
 static void s_window_key_callback(
     GLFWwindow *window,
@@ -404,13 +415,61 @@ void gl_end_frame() {
     running = !glfwWindowShouldClose(window);
 }
 
+void test_some_shit() {
+    neat_t neat = neat_init(1000, 5000);
+
+    prepare_neat(&neat, 4, 2);
+    neat.genes[4].x = 1000000;
+
+    genome_t parent1 = genome_init(&neat);
+    genome_t parent2 = genome_init(&neat);
+
+    mutate_add_connection(1, 4, &parent1, &neat);
+    mutate_add_connection(2, 4, &parent1, &neat);
+    parent1.connections.connections[1].enabled = 0;
+    mutate_add_connection(3, 4, &parent1, &neat);
+    mutate_add_connection(2, 5, &parent1, &neat);
+    mutate_add_connection(5, 4, &parent1, &neat);
+
+    mutate_add_connection(1, 4, &parent2, &neat);
+    mutate_add_connection(2, 4, &parent2, &neat);
+    parent2.connections.connections[1].enabled = 0;
+    mutate_add_connection(3, 4, &parent2, &neat);
+    mutate_add_connection(2, 5, &parent2, &neat);
+    mutate_add_connection(5, 4, &parent2, &neat);
+    parent2.connections.connections[4].enabled = 0;
+    mutate_add_gene(5, 4, &parent2, &neat);
+
+    mutate_add_connection(1, 5, &parent1, &neat);
+
+    mutate_add_connection(3, 5, &parent2, &neat);
+    mutate_add_connection(1, 6, &parent2, &neat);
+
+    print_genome(&neat, &parent1);
+    print_genome(&neat, &parent2);
+
+    neat_entity_t a, b;
+    a.genome = parent1;
+    b.genome = parent2;
+    a.score = 10;
+    b.score = 100;
+
+    genome_t offspring = genome_crossover(&neat, &parent2, &parent1);
+
+    print_genome(&neat, &offspring);
+
+    printf("Distance between the parents: %f\n", genome_distance(&parent2, &parent1));
+    printf("Distance between the parents: %f\n", genome_distance(&parent1, &parent2));
+}
+
 int32_t main(
     int argc,
     char *argv[]) {
-    neat_module_init();
-
     srand(time(NULL));
 
+    neat_module_init();
+
+    // test_some_shit();
 
     // Test
     // neat = neat_init(1000, 50000);
@@ -497,7 +556,7 @@ int32_t main(
 
         frame_time = glfwGetTime() - frame_time;
         game.dt = frame_time;
-        game.dt = 0.1f;
+        game.dt = 0.2f;
     }
 
     gl_context_terminate();

@@ -96,6 +96,10 @@ struct genome_t {
     gene_connection_tracker_t connections;
 };
 
+void print_genome(
+    neat_t *neat,
+    genome_t *genome);
+
 genome_t genome_init(
     neat_t *neat);
 
@@ -109,6 +113,19 @@ void run_genome(
     genome_t *genome,
     float *inputs,
     float *outputs);
+
+// Simply adds connection between two genes
+void mutate_add_connection(
+    uint32_t from, uint32_t to,
+    genome_t *genome,
+    neat_t *neat);
+
+// Takes a connection and adds a gene in between the end nodes of the connection
+// Weight of the first connection = 1, weight of second = previous value
+void mutate_add_gene(
+    uint32_t from, uint32_t to,
+    genome_t *genome,
+    neat_t *neat);
 
 // Simply adds connection between two genes
 void mutate_add_connection(
@@ -203,3 +220,8 @@ void prepare_evaluation();
 // After having calculated the scores, do some shit and evolve
 void end_evaluation_and_evolve(
     neat_universe_t *universe);
+
+genome_t genome_crossover(
+    neat_t *neat,
+    genome_t *a,
+    genome_t *b);

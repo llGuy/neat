@@ -42,6 +42,10 @@ void gene_connection_tracker_t::init(
 uint32_t gene_connection_tracker_t::add_connection(
     gene_id_t from,
     gene_id_t to) {
+    if (connection_count + 1 >= max_connection_count) {
+        assert(0);
+    }
+
     uint32_t new_connection_index = connection_count++;
     gene_connection_t *new_connection_ptr = &connections[new_connection_index];
     connections_by_innovation_number[new_connection_index] = new_connection_index;
@@ -57,6 +61,9 @@ uint32_t gene_connection_tracker_t::add_connection(
     gene_id_t from,
     gene_id_t to,
     uint32_t connection_index) {
+    if (connection_index >= max_connection_count) {
+        assert(0);
+    }
     uint32_t new_connection_index = connection_index;
     gene_connection_t *new_connection_ptr = &connections[new_connection_index];
 
@@ -89,6 +96,10 @@ uint32_t gene_connection_tracker_t::remove_connection(
 
 gene_connection_t *gene_connection_tracker_t::get(
     uint32_t index) {
+    if (index >= max_connection_count) {
+        assert(0);
+    }
+
     return &connections[index];
 }
 
@@ -99,6 +110,10 @@ gene_connection_t *gene_connection_tracker_t::fetch_gene_connection(
     uint32_t *index = finder->get(hash);
 
     if (index) {
+        if (*index >= max_connection_count) {
+            assert(0);
+        }
+
         return &connections[*index];
     }
     else {
@@ -197,8 +212,107 @@ genome_t genome_init(
     return genome;
 }
 
+void print_genome(
+    neat_t *neat,
+    genome_t *genome) {
+    printf("Node genes: \n");
+    for (uint32_t i = 0; i < genome->gene_count; ++i) {
+        printf("  - Node ID %d\n", genome->genes[i]);
+    }
+
+    printf("Connection genes: \n");
+    for (uint32_t i = 0; i < genome->connections.connection_count; ++i) {
+        gene_connection_t *connection = genome->connections.get(i);
+        printf("  - Connection with innovation number %d, from %d -> %d (enabled: %d)\n", connection->innovation_number, connection->from, connection->to, connection->enabled);
+    }
+}
+
 #define WEIGHT_SHIFT 0.3f
 #define WEIGHT_RANDOM 1.0f
+
+void mutate_add_connection(
+    uint32_t gene_from_id, uint32_t gene_to_id,
+    genome_t *genome,
+    neat_t *neat) {
+    // Get two random genes
+    // TODO: Must optimise this in the future
+    gene_t *from = &neat->genes[gene_from_id];
+    gene_t *to = &neat->genes[gene_to_id];
+
+    if (from->x == to->x) {
+    }
+
+    if (from->x > to->x) {
+        // Swap
+        gene_id_t tmp = gene_from_id;
+        gene_from_id = gene_to_id;
+        gene_to_id = tmp;
+    }
+
+    gene_connection_t *connection = genome->connections.fetch_gene_connection(
+        gene_from_id,
+        gene_to_id);
+
+    // If the connection already exists in the genome
+    if (connection) {
+    }
+    else {
+        // Need to check if the connection has been created in the NEAT
+        connection = neat->connections.fetch_gene_connection(
+            gene_from_id,
+            gene_to_id);
+
+        if (connection) {
+            // Add it to the connections in the genome
+            // and add it to the connection finder of the genome
+            // WITH the innovation number that was in the NEAT
+            uint32_t new_connection_index = genome->connections.add_connection(
+                gene_from_id,
+                gene_to_id);
+
+            // Src = connection data that's in the NEAT
+            gene_connection_t *src_connection = connection;
+            gene_connection_t *dst_connection = genome->connections.get(
+                new_connection_index);
+
+            memcpy(
+                dst_connection,
+                src_connection,
+                sizeof(gene_connection_t));
+
+            dst_connection->enabled = 1;
+            dst_connection->weight = (s_rand_01() * 2.0f - 1.0f) * WEIGHT_RANDOM;
+            // No need to set the innovation number because the innovation
+            // number will have been set if the connection has been added
+            // before (also through the memcpy)
+
+            // printf("Connection was created before in the NEAT\n");
+        }
+        else {
+            // Here we need to add the connection in the NEAT
+            // because it is a new one that does not exist in the NEAT
+            uint32_t new_connection_index = neat->connections.add_connection(
+                gene_from_id,
+                gene_to_id);
+
+            gene_connection_t *src = neat->connections.get(new_connection_index);
+            src->innovation_number = new_connection_index;
+            src->from = gene_from_id;
+            src->to = gene_to_id;
+            src->enabled = 1;
+
+            new_connection_index = genome->connections.add_connection(
+                gene_from_id,
+                gene_to_id);
+            gene_connection_t *dst = genome->connections.get(new_connection_index);
+
+            memcpy(dst, src, sizeof(gene_connection_t));
+            dst->weight = (s_rand_01() * 2.0f - 1.0f) * WEIGHT_RANDOM;
+
+            // printf("New connection was created\n");
+        }
+    }
+}
 
 void mutate_add_connection(
     genome_t *genome,
@@ -296,6 +410,82 @@ void mutate_add_connection(
 }
 
 void mutate_add_gene(
+    uint32_t from, uint32_t to,
+    genome_t *genome,
+    neat_t *neat) {
+    gene_connection_t *connection = genome->connections.fetch_gene_connection(from, to);
+
+    gene_t *src = &neat->genes[connection->from];
+    gene_t *dst = &neat->genes[connection->to];
+
+    uint32_t middle_x = (dst->x + src->x) / 2;
+    float middle_y = (dst->y + src->y) / 2.0f + s_rand_01() / 5.0f; // Some noise
+
+    if (neat->gene_count + 1 >= neat->max_gene_count) {
+        assert(0);
+    }
+    gene_id_t new_gene_id = neat->gene_count++;
+    gene_t *new_gene_ptr = &neat->genes[new_gene_id];
+
+    // printf("New gene ID: %d - produced from previous connection: %d to %d\n", new_gene_id, connection->from, connection->to);
+
+    new_gene_ptr->x = middle_x;
+    new_gene_ptr->y = middle_y;
+
+    if (genome->gene_count + 1 >= genome->max_gene_count) {
+        assert(0);
+    }
+            
+    genome->genes[genome->gene_count++] = new_gene_id;
+
+    // Prev = before the new node, next = after the new node
+    gene_connection_t *prev_connection, *next_connection;
+
+    uint32_t prev_connection_index = neat->connections.add_connection(
+        connection->from,
+        new_gene_id);
+    prev_connection = neat->connections.get(prev_connection_index);
+        
+    uint32_t next_connection_index = neat->connections.add_connection(
+        new_gene_id,
+        connection->to);
+    next_connection = neat->connections.get(next_connection_index);
+
+    prev_connection->enabled = 1;
+    prev_connection->from = connection->from;
+    prev_connection->to = new_gene_id;
+    prev_connection->weight = 1.0f;
+    prev_connection->innovation_number = prev_connection_index;
+
+    next_connection->enabled = 1;
+    next_connection->from = new_gene_id;
+    next_connection->to = connection->to;
+    next_connection->weight = connection->weight;
+    next_connection->innovation_number = next_connection_index;
+
+    uint32_t prev_genome_index = genome->connections.add_connection(
+        prev_connection->from,
+        prev_connection->to);
+
+    // Need to remove this gene connection
+    memcpy(
+        genome->connections.get(prev_genome_index),
+        prev_connection,
+        sizeof(gene_connection_t));
+
+    uint32_t next_genome_index = genome->connections.add_connection(
+        next_connection->from,
+        next_connection->to);
+
+    memcpy(
+        genome->connections.get(next_genome_index),
+        next_connection,
+        sizeof(gene_connection_t));
+
+    connection->enabled = 0;
+}
+
+void mutate_add_gene(
     genome_t *genome,
     neat_t *neat) {
     // First get a random connection in the genome
@@ -309,6 +499,9 @@ void mutate_add_gene(
         uint32_t middle_x = (dst->x + src->x) / 2;
         float middle_y = (dst->y + src->y) / 2.0f + s_rand_01() / 5.0f; // Some noise
 
+        if (neat->gene_count + 1 >= neat->max_gene_count) {
+            assert(0);
+        }
         gene_id_t new_gene_id = neat->gene_count++;
         gene_t *new_gene_ptr = &neat->genes[new_gene_id];
 
@@ -317,6 +510,10 @@ void mutate_add_gene(
         new_gene_ptr->x = middle_x;
         new_gene_ptr->y = middle_y;
 
+        if (genome->gene_count + 1 >= genome->max_gene_count) {
+            assert(0);
+        }
+            
         genome->genes[genome->gene_count++] = new_gene_id;
 
         // Prev = before the new node, next = after the new node
@@ -512,7 +709,7 @@ static void s_sort_by_innovation_number(
 
 #define DISTANCE_FACTOR0 1.0f
 #define DISTANCE_FACTOR1 1.0f
-#define DISTANCE_FACTOR2 3.0f
+#define DISTANCE_FACTOR2 10.0f
 
 float genome_distance(
     genome_t *a,
@@ -706,8 +903,12 @@ struct node_t {
 
     uint32_t connection_count;
     // May have to increase this in the future
-    uint32_t connections[50];
+    uint32_t connections[100];
 };
+
+#define MAX_DUMMY_CONNECTIONS 50000
+#define MAX_DUMMY_NODES 10000
+#define MAX_NODE_INDICES 10000
 
 static connection_t *dummy_connections;
 static node_t *dummy_nodes;
@@ -723,6 +924,10 @@ void run_genome(
 
     uint32_t node_count = 0;
 
+    if (genome->gene_count >= MAX_DUMMY_NODES) {
+        assert(0);
+    }
+
     // Set all the values in the nodes to 0
     for (uint32_t i = 0; i < genome->gene_count; ++i) {
         finder.insert(genome->genes[i], i);
@@ -730,6 +935,9 @@ void run_genome(
 
         gene_t *gene = &neat->genes[dummy_nodes[i].gene_id];
 
+        if (i >= MAX_DUMMY_NODES) {
+            assert(0);
+        }
         dummy_nodes[i].x = gene->x;
         dummy_nodes[i].connection_count = 0;
 
@@ -933,7 +1141,7 @@ void eliminate_weakest(
         }
 
         uint32_t removed_count = 0;
-        uint32_t to_eliminate = (uint32_t)(0.5f * (float)species->entity_count);
+        uint32_t to_eliminate = (uint32_t)(0.4f * (float)species->entity_count);
         for (uint32_t i = 0; i < to_eliminate; ++i) {
             neat_entity_t *entity = species->entities[i];
 
@@ -985,7 +1193,7 @@ void universe_init(
     uint32_t entity_count,
     uint32_t input_count,
     uint32_t output_count) {
-    universe->neat = neat_init(1000, 10000);
+    universe->neat = neat_init(10000, 100000);
     prepare_neat(&universe->neat, input_count, output_count);
 
     universe->species_count = 0;
@@ -1045,6 +1253,16 @@ species_t *species_init(
 // PROBLEM IS PROBABLY IN THE ELIMINATION OF THE SHITTIEST GENOMES
 void end_evaluation_and_evolve(
     neat_universe_t *universe) {
+    uint32_t best_entity = 0;
+    float best_score = 0.0f;
+
+    for (uint32_t i = 0; i < universe->entity_count; ++i) {
+        if (universe->entities[i].score > best_score) {
+            best_entity = i;
+            best_score = universe->entities[i].score;
+        }
+    }
+
     // This will select a new representative
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         reset_species(&universe->species[i]);
@@ -1079,12 +1297,12 @@ void end_evaluation_and_evolve(
         }
     }
 
-    printf("There were %d representatives\n", representatives);
+    //printf("There were %d representatives\n", representatives);
 
     printf("Created %d species\n", universe->species_count);
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
-        printf("Species %d has %d entities\n", universe->species[i].id, universe->species[i].entity_count);
+        //printf("Species %d has %d entities\n", universe->species[i].id, universe->species[i].entity_count);
     }
 
     float average_score = 0.0f;
@@ -1147,14 +1365,17 @@ void end_evaluation_and_evolve(
     }
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {
-        printf("Species %d is left\n", universe->species[i].id);
+        //printf("Species %d is left\n", universe->species[i].id);
 
         if (universe->species[i].entity_count < 1) {
             assert(0);
         }
     }
 
-    printf("Breeding...\n");
+    //printf("Breeding...\n");
+
+    if (universe->entities[best_entity].species == NULL) {
+    }
 
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         neat_entity_t *entity = &universe->entities[i];

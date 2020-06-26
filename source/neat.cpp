@@ -1297,8 +1297,6 @@ void end_evaluation_and_evolve(
         }
     }
 
-    //printf("There were %d representatives\n", representatives);
-
     printf("Created %d species\n", universe->species_count);
 
     for (uint32_t i = 0; i < universe->species_count; ++i) {

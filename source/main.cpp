@@ -1,3 +1,15 @@
+/*
+
+  Things to test:
+        - Running the genome
+        - Speciation
+        
+  Things that work:
+        - Crossover
+        - Distance function
+
+ */
+
 #define GLEW_STATIC
 
 #include <time.h>
@@ -103,10 +115,10 @@ static void s_update_game() {
         // y position of the bird, y position of the top opening, y position of the bottom opening
         // x position of the opening
         float inputs[4] = {
-                           bird->current_y,
-                           nearest_opening + game.pipe_opening_size / 2.0f,
-                           nearest_opening - game.pipe_opening_size / 2.0f,
-                           smallest_x
+            bird->current_y,
+            nearest_opening + game.pipe_opening_size / 2.0f,
+            nearest_opening - game.pipe_opening_size / 2.0f,
+            smallest_x
         };
 
         float outputs[2] = {

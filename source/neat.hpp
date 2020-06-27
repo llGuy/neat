@@ -162,6 +162,8 @@ struct neat_entity_t {
     genome_t genome;
 
     struct species_t *species;
+
+    bool dont_kill_me;
 };
 
 struct species_t {
@@ -169,7 +171,8 @@ struct species_t {
 
     // That are of the same species
     neat_entity_t **entities;
-    uint32_t entity_count;
+    neat_entity_t **survivors;
+    uint32_t entity_count, survivor_count;
 
     float average_score;
 };

@@ -1091,6 +1091,11 @@ void reset_species(
     float highest_score = 0.0f;
 
     for (uint32_t i = 0; i < species->entity_count; ++i) {
+        if (species->entities[i]->species == NULL) {
+            printf("There was an error\n");
+            assert(0);
+        }
+
         species->entities[i]->species = NULL;
 
         if (species->entities[i]->score > highest_score) {
@@ -1144,30 +1149,55 @@ void eliminate_weakest(
 
         for (uint32_t i = 1; i < species->entity_count; ++i) {
             species->entities[i]->species = NULL;
+            if (species->entities[i]->dont_kill_me) {
+                assert(0);
+            }
         }
 
         uint32_t survivor_count = (uint32_t)(SURVIVOR_RATE  * (float)species->entity_count);
 
-        species->entity_count = survivor_count;
+        species->entity_count = 1;
+        species->survivor_count = survivor_count;
+
+        for (uint32_t i = 0; i < survivor_count; ++i) {
+            species->survivors[i] = species->entities[i];
+
+            if (species->survivors[i] == NULL) {
+                assert(0);
+            }
+        }
 
         // The best will be the very first one
         species->entities[0]->species = species;
+        species->entities[0]->dont_kill_me = 1;
+    }
+    else {
+        for (uint32_t i = 0; i < species->entity_count; ++i) {
+            species->survivors[i] = species->entities[i];
+            species->survivors[i]->species = NULL;
+
+            if (species->survivors[i]->dont_kill_me) {
+                assert(0);
+            }
+        }
+
+        species->survivor_count = species->entity_count;
     }
 }
 
 genome_t breed_genomes(
     neat_t *neat,
     species_t *species) {
-    uint32_t first = rand() % species->entity_count;
-    neat_entity_t *a = species->entities[first];
+    uint32_t first = rand() % species->survivor_count;
+    neat_entity_t *a = species->survivors[first];
 
-    uint32_t other = rand() % species->entity_count;
+    uint32_t other = rand() % species->survivor_count;
 
-    while (other == first && species->entity_count > 1) {
-        other = rand() % species->entity_count;
+    while (other == first && species->survivor_count > 1) {
+        other = rand() % species->survivor_count;
     }
 
-    neat_entity_t *b = species->entities[other];
+    neat_entity_t *b = species->survivors[other];
 
     if (a->score > b->score) {
         return genome_crossover(neat, &a->genome, &b->genome);
@@ -1212,6 +1242,7 @@ species_t *species_init(
     species->average_score = 0.0f;
     species->entity_count = 0;
     species->entities = (neat_entity_t **)malloc(sizeof(neat_entity_t *) * universe->entity_count);
+    species->survivors = (neat_entity_t **)malloc(sizeof(neat_entity_t *) * universe->entity_count / 2);
     species->id = id;
 
     return species;
@@ -1254,6 +1285,8 @@ void end_evaluation_and_evolve(
         }
 
         avg_score += universe->entities[i].score;
+
+        universe->entities[i].dont_kill_me = 0;
     }
 
     printf("Generation's average score = %f\n", avg_score / (float)universe->entity_count);
@@ -1310,7 +1343,7 @@ void end_evaluation_and_evolve(
         species_t *a = &universe->species[i];
         species_t *b = &universe->species[i + 1];
 
-        if (a->entity_count < b->entity_count) {
+        if (a->survivor_count < b->survivor_count) {
             species_t tmp = *a;
             universe->species[i] = *b;
             universe->species[i + 1] = tmp;
@@ -1320,7 +1353,7 @@ void end_evaluation_and_evolve(
                 a = &universe->species[j];
                 b = &universe->species[j + 1];
         
-                if (a->entity_count < b->entity_count) {
+                if (a->survivor_count < b->survivor_count) {
                     tmp = *a;
                     universe->species[j] = *b;
                     universe->species[j + 1] = tmp;
@@ -1335,18 +1368,24 @@ void end_evaluation_and_evolve(
     uint32_t eliminated_species = 0;
     uint32_t i = 0;
     for (; i < universe->species_count; ++i) {
-        if (universe->species[i].entity_count <= 1) {
+        if (universe->species[i].survivor_count <= 1) {
             break;
         }
     }
 
     for (; i < universe->species_count; ++i) {
-        for (uint32_t e = 0; e < universe->species[i].entity_count; ++e) {
-            universe->species[i].entities[e]->species = NULL;
-            ++eliminated_species;
+        for (uint32_t e = 0; e < universe->species[i].survivor_count; ++e) {
+            universe->species[i].survivors[e]->species = NULL;
+
+            // if (universe->species[i].survivors[e]->dont_kill_me) {
+            //     assert(0);
+            // }
         }
 
         free(universe->species[i].entities);
+        free(universe->species[i].survivors);
+
+        ++eliminated_species;
     }
 
     universe->species_count -= eliminated_species;
@@ -1358,7 +1397,7 @@ void end_evaluation_and_evolve(
     for (uint32_t i = 0; i < universe->species_count; ++i) {
         //printf("Species %d is left\n", universe->species[i].id);
 
-        if (universe->species[i].entity_count < 1) {
+        if (universe->species[i].survivor_count < 1) {
             assert(0);
         }
     }

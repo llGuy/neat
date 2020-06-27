@@ -1053,7 +1053,7 @@ bool add_entity(
 
     // Representative is just the first one
     if (do_check) {
-        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 3.0f) {
+        if (genome_distance(&entity->genome, &species->entities[0]->genome) < 5.0f) {
             species->entities[species->entity_count++] = entity;
             entity->species = species;
             return true;
@@ -1110,6 +1110,8 @@ void reset_species(
     species->average_score = 0.0f;
 }
 
+#define SURVIVOR_RATE 0.5f
+
 void eliminate_weakest(
     species_t *species) {
     // Need to sort in terms of the score
@@ -1118,7 +1120,7 @@ void eliminate_weakest(
             neat_entity_t *a = species->entities[i];
             neat_entity_t *b = species->entities[i + 1];
 
-            if (a->score > b->score) {
+            if (a->score < b->score) {
                 neat_entity_t *tmp = a;
                 species->entities[i] = b;
                 species->entities[i + 1] = tmp;
@@ -1128,7 +1130,7 @@ void eliminate_weakest(
                     a = species->entities[j];
                     b = species->entities[j + 1];
         
-                    if (a->score > b->score) {
+                    if (a->score < b->score) {
                         tmp = a;
                         species->entities[j] = b;
                         species->entities[j + 1] = tmp;
@@ -1140,28 +1142,16 @@ void eliminate_weakest(
             }
         }
 
-        uint32_t removed_count = 0;
-        uint32_t to_eliminate = (uint32_t)(0.4f * (float)species->entity_count);
-        for (uint32_t i = 0; i < to_eliminate; ++i) {
-            neat_entity_t *entity = species->entities[i];
-
-            entity->species = NULL;
-
-            if (i < species->entity_count - 1) {
-                // Remove this entity
-                uint32_t opposing = species->entity_count - removed_count - 1;
-                species->entities[i] = species->entities[opposing];
-            }
-
-            ++removed_count;
-        }
-
-       species->entity_count -= removed_count;
-
-        // Now best one should be at index 0
         for (uint32_t i = 1; i < species->entity_count; ++i) {
             species->entities[i]->species = NULL;
         }
+
+        uint32_t survivor_count = (uint32_t)(SURVIVOR_RATE  * (float)species->entity_count);
+
+        species->entity_count = survivor_count;
+
+        // The best will be the very first one
+        species->entities[0]->species = species;
     }
 }
 
@@ -1255,12 +1245,18 @@ void end_evaluation_and_evolve(
     uint32_t best_entity = 0;
     float best_score = 0.0f;
 
+    float avg_score = 0.0f;
+
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         if (universe->entities[i].score > best_score) {
             best_entity = i;
             best_score = universe->entities[i].score;
         }
+
+        avg_score += universe->entities[i].score;
     }
+
+    printf("Generation's average score = %f\n", avg_score / (float)universe->entity_count);
 
     // This will select a new representative
     for (uint32_t i = 0; i < universe->species_count; ++i) {
@@ -1297,10 +1293,6 @@ void end_evaluation_and_evolve(
     }
 
     printf("Created %d species\n", universe->species_count);
-
-    for (uint32_t i = 0; i < universe->species_count; ++i) {
-        //printf("Species %d has %d entities\n", universe->species[i].id, universe->species[i].entity_count);
-    }
 
     float average_score = 0.0f;
 
@@ -1353,6 +1345,8 @@ void end_evaluation_and_evolve(
             universe->species[i].entities[e]->species = NULL;
             ++eliminated_species;
         }
+
+        free(universe->species[i].entities);
     }
 
     universe->species_count -= eliminated_species;
@@ -1369,15 +1363,16 @@ void end_evaluation_and_evolve(
         }
     }
 
-    //printf("Breeding...\n");
-
-    if (universe->entities[best_entity].species == NULL) {
-    }
+    uint32_t breeded_genomes = 0;
 
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         neat_entity_t *entity = &universe->entities[i];
 
         if (entity->species == NULL) {
+            if (i == best_entity) {
+                printf("######################################### BEST ENTITY WAS ELIMINATED!!! ######################################\n");
+            }
+
             // Get a random species and breed!
             uint32_t index = rand() % universe->species_count;
             species_t *species = &universe->species[index];
@@ -1386,11 +1381,10 @@ void end_evaluation_and_evolve(
             add_entity(0, entity, species);
 
             mutate_genome(&universe->neat, &universe->entities[i].genome);
+
+            ++breeded_genomes;
         }
     }
 
-    // Mutate all the entities now
-    // for (uint32_t i = 0; i < universe->entity_count; ++i) {
-    //     mutate_genome(&universe->neat, &universe->entities[i].genome);
-    // }
+    printf("Bread %d genomes (there are %d representatives)\n", breeded_genomes, universe->species_count);
 }

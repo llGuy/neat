@@ -74,7 +74,7 @@ static float s_rand_01() {
 
 #define BIRD_X_POSITION -0.9f
 
-static void s_update_game() {
+static bool s_update_game() {
     uint32_t closest_pipe = 0;
     float smallest_x = 1.0f;
 
@@ -143,12 +143,7 @@ static void s_update_game() {
             // Lost
             bird->dead = 1;
 
-            if (bird->score < 1.0f) {
-                game.universe.entities[game.current_bird].score = 0.0f;
-            }
-            else {
-                game.universe.entities[game.current_bird].score = bird->score + bird->distance;
-            }
+            game.universe.entities[game.current_bird].score = bird->score + bird->distance;
 
             // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
 
@@ -162,6 +157,8 @@ static void s_update_game() {
             if (bird->current_y < game.opening_centres[game.behind_pipe] + game.pipe_opening_size / 2.0f &&
                 bird->current_y > game.opening_centres[game.behind_pipe] - game.pipe_opening_size / 2.0f) {
                 bird->score += 100.0f;
+
+                printf("Bird %d just got through a pipe!\n", game.current_bird);
 
                 // printf("Score: %f\n", bird->score);
             }
@@ -231,7 +228,11 @@ static void s_update_game() {
         }
 
         game.current_bird = 0;
+
+        return false;
     }
+
+    return true;
 }
 
 static void s_render_game() {
@@ -313,7 +314,7 @@ static void s_game_init() {
         game.birds[i].distance = 0.0f;
     }
 
-    to_break =0 ;
+    to_break = 0;
 
     game.pipe_opening_size = 0.2f;
     game.pipe_distance = 0.5f;
@@ -326,7 +327,7 @@ static void s_game_init() {
         game.opening_centres[i] = (float)i / 8.0f - 0.5f;
     }
 
-    game.rendering_game = 1;
+    game.rendering_game = 0;
     game.displayed_genome = 0;
 }
 
@@ -366,7 +367,9 @@ static void s_window_key_callback(
         } break;
 
         case GLFW_KEY_SPACE: {
-            game.birds[0].velocity_y = 1.0f;
+            while (s_update_game()) {
+                game.dt = 0.2f;
+            }
         } break;
 
         case GLFW_KEY_ESCAPE: {
@@ -514,7 +517,7 @@ int32_t main(
 
     neat_module_init();
 
-    test_some_shit();
+    // test_some_shit();
 
     // Test
     // neat = neat_init(1000, 50000);

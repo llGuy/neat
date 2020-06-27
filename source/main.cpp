@@ -472,6 +472,25 @@ void test_some_shit() {
 
     printf("Distance between the parents: %f\n", genome_distance(&parent2, &parent1));
     printf("Distance between the parents: %f\n", genome_distance(&parent1, &parent2));
+
+    float inputs[4] = {
+                       1.5f,
+                       4.2f,
+                       2.3f,
+                       3.1f
+    };
+
+    float outputs[2] = {
+                        0.0f, 0.0f
+    };
+
+    run_genome(&neat, &parent1, inputs, outputs);
+
+    printf("Outputs: %f %f\n", outputs[0], outputs[1]);
+
+    run_genome(&neat, &parent2, inputs, outputs);
+
+    printf("Outputs: %f %f\n", outputs[0], outputs[1]);
 }
 
 int32_t main(
@@ -481,7 +500,7 @@ int32_t main(
 
     neat_module_init();
 
-    // test_some_shit();
+    test_some_shit();
 
     // Test
     // neat = neat_init(1000, 50000);

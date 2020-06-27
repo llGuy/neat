@@ -148,7 +148,7 @@ static bool s_update_game() {
             // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
 
             if (bird->score + bird->distance > 0.05f) {
-                printf("Something good happened to bird %d\n", game.current_bird);
+                // printf("Something good happened to bird %d\n", game.current_bird);
             }
         }
 
@@ -166,7 +166,7 @@ static bool s_update_game() {
                 bird->dead = 1;
 
                 if (bird->score + bird->distance > 0.05f) {
-                    printf("Something good happened to bird %d\n", game.current_bird);
+                    //printf("Something good happened to bird %d\n", game.current_bird);
                 }
 
                 game.universe.entities[game.current_bird].score = bird->score + bird->distance;
@@ -316,7 +316,7 @@ static void s_game_init() {
 
     to_break = 0;
 
-    game.pipe_opening_size = 0.2f;
+    game.pipe_opening_size = 0.4f;
     game.pipe_distance = 0.5f;
 
     game.behind_pipe = 0xFFFF;

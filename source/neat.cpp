@@ -1250,7 +1250,6 @@ species_t *species_init(
 // --- Iterate through all clients and mutate each one
 
 
-// PROBLEM IS PROBABLY IN THE ELIMINATION OF THE SHITTIEST GENOMES
 void end_evaluation_and_evolve(
     neat_universe_t *universe) {
     uint32_t best_entity = 0;

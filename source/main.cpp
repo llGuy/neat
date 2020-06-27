@@ -491,6 +491,20 @@ void test_some_shit() {
     run_genome(&neat, &parent2, inputs, outputs);
 
     printf("Outputs: %f %f\n", outputs[0], outputs[1]);
+
+    neat_universe_t universe = {};
+    universe_init(&universe, 3, 4, 2);
+
+    universe.neat = neat;
+    universe.entities[0].genome = parent1;
+    universe.entities[1].genome = parent2;
+    universe.entities[2].genome = offspring;
+
+    universe.entities[0].score = 10.0f;
+    universe.entities[1].score = 3.0f;
+    universe.entities[2].score = 5.0f;
+
+    end_evaluation_and_evolve(&universe);
 }
 
 int32_t main(

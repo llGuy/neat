@@ -9,6 +9,11 @@ struct gene_t {
     uint32_t x;
     // y variable just used for display
     float y;
+
+    uint32_t connection_count;
+    uint32_t *connection_list;
+
+    float current_value;
 };
 
 typedef uint32_t gene_id_t;
@@ -34,6 +39,8 @@ struct gene_connection_tracker_t {
 
     void init(
         uint32_t max_connection_count);
+
+    void free_tracker();
 
     // This function JUST adds a connection
     uint32_t add_connection(
@@ -174,6 +181,7 @@ struct species_t {
     neat_entity_t **survivors;
     uint32_t entity_count, survivor_count;
 
+
     float average_score;
 };
 
@@ -203,6 +211,9 @@ struct neat_universe_t {
 
     uint32_t species_count;
     species_t *species;
+
+    uint32_t to_free_count;
+    genome_t *to_free;
 };
 
 void universe_init(

@@ -39,6 +39,13 @@ void gene_connection_tracker_t::init(
     finder->init();
 }
 
+void gene_connection_tracker_t::free_tracker() {
+    free(connections);
+    free(finder);
+    free(connections_by_innovation_number);
+    free(connections_by_position);
+}
+
 uint32_t gene_connection_tracker_t::add_connection(
     gene_id_t from,
     gene_id_t to) {
@@ -210,6 +217,12 @@ genome_t genome_init(
     }
 
     return genome;
+}
+
+void free_genome(
+    genome_t *genome) {
+    free(genome->genes);
+    genome->connections.free_tracker();
 }
 
 void print_genome(
@@ -906,11 +919,13 @@ struct node_t {
     uint32_t connections[100];
 };
 
+static uint32_t connection_pointer;
+static uint32_t *connection_list;
+
 #define MAX_DUMMY_CONNECTIONS 50000
 #define MAX_DUMMY_NODES 10000
 #define MAX_NODE_INDICES 10000
 
-static connection_t *dummy_connections;
 static node_t *dummy_nodes;
 static uint32_t *node_indices;
 static connection_finder_t finder;
@@ -920,6 +935,9 @@ void run_genome(
     genome_t *genome,
     float *inputs,
     float *outputs) {
+#if 1
+    connection_pointer = 0;
+
     finder.clear();
 
     uint32_t node_count = 0;
@@ -1033,10 +1051,151 @@ void run_genome(
         node_t *node = &dummy_nodes[*index];
         outputs[i] = node->current_value;
     }
+#else
+    
+    connection_pointer = 0;
+
+    finder.clear();
+
+    uint32_t node_count = 0;
+
+    if (genome->gene_count >= MAX_DUMMY_NODES) {
+        assert(0);
+    }
+
+    // Set all the values in the nodes to 0
+    for (uint32_t i = 0; i < genome->gene_count; ++i) {
+        gene_id_t gene_id = genome->genes[i];
+
+        finder.insert(genome->genes[i], i);
+
+        // dummy_nodes[i].gene_id = genome->genes[i];
+
+        gene_t *gene = &neat->genes[gene_id];
+
+        if (i >= MAX_DUMMY_NODES) {
+            assert(0);
+        }
+
+        gene->connection_count = 0;
+
+        if (i < neat->input_count) {
+            gene->current_value = inputs[i];
+        }
+        else {
+            gene->current_value = 0.0f;
+        }
+
+        // We will sort this later according to the x values
+        node_indices[i] = i;
+    }
+
+    // Just count how many gene connections each node has
+    for (uint32_t i = 0; i < genome->connections.connection_count; ++i) {
+        gene_connection_t *connection = genome->connections.get(i);
+
+        neat->genes[connection->to].connection_count++;
+    }
+
+    // Allocate enough space for the connection of each gene
+    for (uint32_t i = 0; i < genome->gene_count; ++i) {
+        gene_id_t id = genome->genes[i];
+
+        gene_t *gene = &neat->genes[id];
+
+        gene->connection_list = connection_list + connection_pointer;
+        connection_pointer += gene->connection_count;
+
+        // Reset so that we can increment
+        gene->connection_count = 0;
+    }
+
+    for (uint32_t i = 0; i < genome->connections.connection_count; ++i) {
+        gene_connection_t *connection = genome->connections.get(i);
+        
+        gene_t *dst_node = &neat->genes[connection->to];
+
+        if (!node_index) {
+            printf("ERROR: Connection has destination which does not exist in the genome's gene list\n");
+            assert(0);
+        }
+
+        node_t *node = &dummy_nodes[*node_index];
+        node->connections[node->connection_count++] = i;
+    }
+
+    // Sort out in terms of the x values
+    for (uint32_t i = 0; i < genome->gene_count - 1; ++i) {
+        uint32_t current_node_index = node_indices[i];
+        uint32_t current_x = dummy_nodes[current_node_index].x;
+
+        uint32_t next_node_index = node_indices[i + 1];
+        uint32_t next_x = dummy_nodes[next_node_index].x;
+        
+        if (current_x > next_x) {
+            uint32_t tmp = current_node_index;
+            node_indices[i] = next_node_index;
+            node_indices[i + 1] = tmp;
+
+            // Problem, need to switch
+            for (int32_t j = i - 1; j >= 0; --j) {
+                current_node_index = node_indices[j];
+                current_x = dummy_nodes[current_node_index].x;
+
+                next_node_index = node_indices[j + 1];
+                next_x = dummy_nodes[next_node_index].x;
+        
+                if (current_x > next_x) {
+                    tmp = current_node_index;
+                    node_indices[j] = next_node_index;
+                    node_indices[j + 1] = tmp;
+                }
+                else {
+                    break;
+                }
+            } 
+        }
+    }
+
+    // This is not going to work - need to do something creative
+    for (uint32_t i = 0; i < genome->gene_count; ++i) {
+        node_t *node = &dummy_nodes[node_indices[i]];
+
+        for (uint32_t c = 0; c < node->connection_count; ++c) {
+            uint32_t connection_index = node->connections[c];
+            gene_connection_t *connection = genome->connections.get(connection_index);
+
+            if (connection->enabled) {
+                uint32_t *from_index = finder.get(connection->from);
+                uint32_t *to_index = finder.get(connection->to);
+                node_t *from = &dummy_nodes[*from_index];
+                node_t *to = &dummy_nodes[*to_index];
+
+                if (to != node) {
+                    printf("ERROR: WE GOT A PROBLEM\n");
+                    assert(0);
+                }
+
+                to->current_value += connection->weight * from->current_value;
+            }
+        }
+
+        node->current_value = s_activation_function(node->current_value);
+    }
+
+    for (uint32_t i = 0; i < neat->output_count; ++i) {
+        gene_id_t id = neat->input_count + i;
+
+        uint32_t *index = finder.get(id);
+        node_t *node = &dummy_nodes[*index];
+        outputs[i] = node->current_value;
+    }
+
+#endif
 }
 
 void neat_module_init() {
-    dummy_connections = (connection_t *)malloc(sizeof(connection_t) * 50000);
+    connection_list = (uint32_t *)malloc(sizeof(uint32_t) * MAX_DUMMY_CONNECTIONS);
     dummy_nodes = (node_t *)malloc(sizeof(node_t) * 10000);
     node_indices = (uint32_t *)malloc(sizeof(uint32_t) * 10000);
     finder.init();
@@ -1223,6 +1382,9 @@ void universe_init(
     universe->entity_count = entity_count;
     universe->entities = (neat_entity_t *)malloc(sizeof(neat_entity_t) * entity_count);
 
+    universe->to_free_count = 0;
+    universe->to_free = (genome_t *)malloc(sizeof(genome_t) * entity_count);
+
     for (uint32_t i = 0; i < universe->entity_count; ++i) {
         neat_entity_t *entity = &universe->entities[i];
 
@@ -1247,29 +1409,6 @@ species_t *species_init(
 
     return species;
 }
-
-// When evolving:
-
-// - create the species
-// --- Reset all the species
-// --- for each client - check if it's not the representative of a species, otherwise, add it to a species it's similar to
-// --- If it wasn't added to a species, create a new species and make this client the representative
-// --- Calculate the scores of the species
-
-// - kill the weakest
-// --- Kills 50% (make a variable) of the population (for each species)
-
-// - delete the extinct ones
-// --- Iterate through each species
-// --- If there are no clients in there, remove it (or if there is only one left)
-
-// - reproduce
-// --- Iterate through all the clients - check if it has been killed - if it has, set it to a new one
-//     created from breeding a random species and assign it to that species (with do_check = false)
-
-// - mutate
-// --- Iterate through all clients and mutate each one
-
 
 void end_evaluation_and_evolve(
     neat_universe_t *universe) {
@@ -1408,6 +1547,9 @@ void end_evaluation_and_evolve(
         neat_entity_t *entity = &universe->entities[i];
 
         if (entity->species == NULL) {
+            universe->to_free[universe->to_free_count] = entity->genome;
+            universe->to_free_count++;
+
             if (i == best_entity) {
                 printf("######################################### BEST ENTITY WAS ELIMINATED!!! ######################################\n");
             }
@@ -1425,5 +1567,14 @@ void end_evaluation_and_evolve(
         }
     }
 
+
+    for (uint32_t i = 0; i < universe->to_free_count; ++i) {
+        free_genome(&universe->to_free[i]);
+    }
+
+    universe->to_free_count = 0;
+
     printf("Bread %d genomes (there are %d representatives)\n", breeded_genomes, universe->species_count);
+
+    printf("There are %d node genes, and %d connection genes\n", universe->neat.gene_count, universe->neat.connections.connection_count);
 }

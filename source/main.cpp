@@ -145,7 +145,6 @@ static bool s_update_game() {
 
             game.universe.entities[game.current_bird].score = bird->score + bird->distance;
 
-            // printf("Bird %d died with score of %f\n", i, bird->score + bird->distance);
 
             if (bird->score + bird->distance > 0.05f) {
                 // printf("Something good happened to bird %d\n", game.current_bird);

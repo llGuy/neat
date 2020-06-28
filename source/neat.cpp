@@ -32,9 +32,6 @@ void gene_connection_tracker_t::init(
     finder = (connection_finder_t *)malloc(
         sizeof(connection_finder_t));
 
-    connections_by_innovation_number = (uint32_t *)malloc(sizeof(uint32_t) * max_connection_count);
-    connections_by_position = (uint32_t *)malloc(sizeof(uint32_t) * max_connection_count);
-
     memset(finder, 0, sizeof(connection_finder_t));
     finder->init();
 }
@@ -42,8 +39,6 @@ void gene_connection_tracker_t::init(
 void gene_connection_tracker_t::free_tracker() {
     free(connections);
     free(finder);
-    free(connections_by_innovation_number);
-    free(connections_by_position);
 }
 
 uint32_t gene_connection_tracker_t::add_connection(
@@ -55,8 +50,6 @@ uint32_t gene_connection_tracker_t::add_connection(
 
     uint32_t new_connection_index = connection_count++;
     gene_connection_t *new_connection_ptr = &connections[new_connection_index];
-    connections_by_innovation_number[new_connection_index] = new_connection_index;
-    connections_by_position[new_connection_index] = new_connection_index;
 
     uint64_t hash = s_connection_hash(from, to);
     finder->insert(hash, new_connection_index);
@@ -73,9 +66,6 @@ uint32_t gene_connection_tracker_t::add_connection(
     }
     uint32_t new_connection_index = connection_index;
     gene_connection_t *new_connection_ptr = &connections[new_connection_index];
-
-    connections_by_innovation_number[new_connection_index] = new_connection_index;
-    connections_by_position[new_connection_index] = new_connection_index;
 
     uint64_t hash = s_connection_hash(from, to);
     finder->insert(hash, new_connection_index);
@@ -630,96 +620,6 @@ void mutate_genome(
     }
 }
 
-static void s_sort_by_position(
-    neat_t *neat,
-    genome_t *a) {
-    // Sort for the positions (of the output node)
-    for (uint32_t i = 0; i < a->connections.connection_count - 1; ++i) {
-        uint32_t current_index = a->connections.connections_by_position[i];
-        uint32_t next_index = a->connections.connections_by_position[i + 1];
-
-        gene_connection_t *current_connection = a->connections.get(current_index);
-        gene_t *current_output_gene = &neat->genes[current_connection->to];
-        uint32_t current_x = current_output_gene->x;
-
-        gene_connection_t *next_connection = a->connections.get(next_index);
-        gene_t *next_output_gene = &neat->genes[next_connection->to];
-        uint32_t next_x = next_output_gene->x;
-        
-        if (current_x > next_x) {
-            uint32_t tmp = current_index;
-            a->connections.connections_by_position[i] = next_index;
-            a->connections.connections_by_position[i + 1] = tmp;
-
-            // Problem, need to switch
-            for (int32_t j = i - 1; j >= 0; --j) {
-                current_index = a->connections.connections_by_position[j];
-                next_index = a->connections.connections_by_position[j + 1];
-
-                current_connection = a->connections.get(current_index);
-                current_output_gene = &neat->genes[current_connection->to];
-                current_x = current_output_gene->x;
-
-                next_connection = a->connections.get(next_index);
-                next_output_gene = &neat->genes[next_connection->to];
-                next_x = next_output_gene->x;
-        
-                if (current_x > next_x) {
-                    tmp = current_index;
-                    a->connections.connections_by_position[j] = next_index;
-                    a->connections.connections_by_position[j + 1] = tmp;
-                }
-                else {
-                    break;
-                }
-            } 
-        }
-    }
-}
-
-static void s_sort_by_innovation_number(
-    neat_t *neat,
-    genome_t *a) {
-    // Sort for the innovation numbers
-    for (uint32_t i = 0; i < a->connections.connection_count - 1; ++i) {
-        uint32_t current_index = a->connections.connections_by_innovation_number[i];
-        uint32_t next_index = a->connections.connections_by_innovation_number[i + 1];
-
-        gene_connection_t *current_connection = a->connections.get(current_index);
-        uint32_t current_innovation = current_connection->innovation_number;
-
-        gene_connection_t *next_connection = a->connections.get(next_index);
-        uint32_t next_innovation = next_connection->innovation_number;
-        
-        if (current_innovation > next_innovation) {
-            uint32_t tmp = current_index;
-            a->connections.connections_by_innovation_number[i] = next_index;
-            a->connections.connections_by_innovation_number[i + 1] = tmp;
-
-            // Problem, need to switch
-            for (int32_t j = i - 1; j >= 0; --j) {
-                current_index = a->connections.connections_by_innovation_number[j];
-                next_index = a->connections.connections_by_innovation_number[j + 1];
-
-                current_connection = a->connections.get(current_index);
-                current_innovation= current_connection->innovation_number;
-
-                next_connection = a->connections.get(next_index);
-                next_innovation= next_connection->innovation_number;
-        
-                if (current_innovation > next_innovation) {
-                    tmp = current_index;
-                    a->connections.connections_by_innovation_number[j] = next_index;
-                    a->connections.connections_by_innovation_number[j + 1] = tmp;
-                }
-                else {
-                    break;
-                }
-            } 
-        }
-    }
-}
-
 #define DISTANCE_FACTOR0 1.0f
 #define DISTANCE_FACTOR1 1.0f
 #define DISTANCE_FACTOR2 10.0f
@@ -886,13 +786,6 @@ genome_t genome_crossover(
     }
 
     return result;
-}
-
-void prepare_genome_for_breed(
-    neat_t *neat,
-    genome_t *a) {
-    s_sort_by_innovation_number(neat, a);
-    s_sort_by_position(neat, a);
 }
 
 static float s_activation_function(
@@ -1224,13 +1117,6 @@ bool add_entity(
         species->entities[species->entity_count++] = entity;
             entity->species = species;
         return true;
-    }
-}
-
-void force_extinction(
-    species_t *species) {
-    for (uint32_t i = 0; i < species->entity_count; ++i) {
-        species->entities[i]->species= NULL;
     }
 }
 

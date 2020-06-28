@@ -33,10 +33,6 @@ struct gene_connection_tracker_t {
     uint32_t connection_count, max_connection_count;
     gene_connection_t *connections;
 
-    // Indices of the connections that are sorted
-    uint32_t *connections_by_innovation_number;
-    uint32_t *connections_by_position;
-
     void init(
         uint32_t max_connection_count);
 
@@ -81,20 +77,6 @@ struct neat_t {
     gene_connection_tracker_t connections;
 };
 
-neat_t neat_init(
-    uint32_t max_genes,
-    uint32_t max_connection);
-
-void prepare_neat(
-    neat_t *neat,
-    uint32_t input_count,
-    uint32_t output_count);
-
-// If gene connection doesn't exist, NULL gets returned
-gene_connection_t *fetch_gene_connection(
-    uint32_t gene_from,
-    uint32_t gene_to);
-
 struct genome_t {
     // Holds the index into the neat's genes array
     uint32_t gene_count, max_gene_count;
@@ -107,55 +89,12 @@ void print_genome(
     neat_t *neat,
     genome_t *genome);
 
-genome_t genome_init(
-    neat_t *neat);
-
-void prepare_genome_for_breed(
-    neat_t *neat,
-    genome_t *a);
-
 // Has to match the number of inputs/outputs specified when creating the NEAT
 void run_genome(
     neat_t *neat,
     genome_t *genome,
     float *inputs,
     float *outputs);
-
-// Simply adds connection between two genes
-void mutate_add_connection(
-    uint32_t from, uint32_t to,
-    genome_t *genome,
-    neat_t *neat);
-
-// Takes a connection and adds a gene in between the end nodes of the connection
-// Weight of the first connection = 1, weight of second = previous value
-void mutate_add_gene(
-    uint32_t from, uint32_t to,
-    genome_t *genome,
-    neat_t *neat);
-
-// Simply adds connection between two genes
-void mutate_add_connection(
-    genome_t *genome,
-    neat_t *neat);
-
-// Takes a connection and adds a gene in between the end nodes of the connection
-// Weight of the first connection = 1, weight of second = previous value
-void mutate_add_gene(
-    genome_t *genome,
-    neat_t *neat);
-
-void mutate_shift_weight(
-    genome_t *genome,
-    neat_t *neat);
-
-void mutate_random_weight(
-    genome_t *genome,
-    neat_t *neat);
-
-void mutate_connection_toggle(
-    genome_t *genome,
-    neat_t *neat);
 
 // Need the connections to be sorted by innovation number
 float genome_distance(
@@ -185,24 +124,6 @@ struct species_t {
     float average_score;
 };
 
-species_t *species_init(
-    struct neat_universe_t *neat);
-
-species_t species_init(
-    uint32_t entity_count);
-
-void force_extinction(
-    species_t *species);
-
-void score(
-    species_t *species);
-
-void eliminate_weakest(
-    species_t *species);
-
-genome_t *breed_genomes(
-    species_t *species);
-
 struct neat_universe_t {
     neat_t neat;
 
@@ -222,20 +143,6 @@ void universe_init(
     uint32_t input_count,
     uint32_t output_count);
 
-// To run before calculating score
-void prepare_evaluation();
-
-// Here calculate the score (this could be running the game
-// then assigning a value in terms of how good the entity performed)
-
-
-
-
 // After having calculated the scores, do some shit and evolve
 void end_evaluation_and_evolve(
     neat_universe_t *universe);
-
-genome_t genome_crossover(
-    neat_t *neat,
-    genome_t *a,
-    genome_t *b);

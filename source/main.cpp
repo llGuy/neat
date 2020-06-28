@@ -345,25 +345,6 @@ static void s_window_key_callback(
     int mods) {
     if (action == GLFW_PRESS) {
         switch (key) {
-        case GLFW_KEY_C: {
-            mutate_add_connection(&genome, &neat);
-        } break;
-
-        case GLFW_KEY_S: {
-            mutate_shift_weight(&genome, &neat);
-        } break;
-
-        case GLFW_KEY_R: {
-            mutate_random_weight(&genome, &neat);
-        } break;
-
-        case GLFW_KEY_T: {
-            mutate_connection_toggle(&genome, &neat);
-        } break;
-
-        case GLFW_KEY_G: {
-            mutate_add_gene(&genome, &neat);
-        } break;
 
         case GLFW_KEY_SPACE: {
             while (s_update_game()) {
@@ -429,85 +410,85 @@ void gl_end_frame() {
     running = !glfwWindowShouldClose(window);
 }
 
-void test_some_shit() {
-    neat_t neat = neat_init(1000, 5000);
+// void test_some_shit() {
+//     neat_t neat = neat_init(1000, 5000);
 
-    prepare_neat(&neat, 4, 2);
-    neat.genes[4].x = 1000000;
+//     prepare_neat(&neat, 4, 2);
+//     neat.genes[4].x = 1000000;
 
-    genome_t parent1 = genome_init(&neat);
-    genome_t parent2 = genome_init(&neat);
+//     genome_t parent1 = genome_init(&neat);
+//     genome_t parent2 = genome_init(&neat);
 
-    mutate_add_connection(1, 4, &parent1, &neat);
-    mutate_add_connection(2, 4, &parent1, &neat);
-    parent1.connections.connections[1].enabled = 0;
-    mutate_add_connection(3, 4, &parent1, &neat);
-    mutate_add_connection(2, 5, &parent1, &neat);
-    mutate_add_connection(5, 4, &parent1, &neat);
+//     mutate_add_connection(1, 4, &parent1, &neat);
+//     mutate_add_connection(2, 4, &parent1, &neat);
+//     parent1.connections.connections[1].enabled = 0;
+//     mutate_add_connection(3, 4, &parent1, &neat);
+//     mutate_add_connection(2, 5, &parent1, &neat);
+//     mutate_add_connection(5, 4, &parent1, &neat);
 
-    mutate_add_connection(1, 4, &parent2, &neat);
-    mutate_add_connection(2, 4, &parent2, &neat);
-    parent2.connections.connections[1].enabled = 0;
-    mutate_add_connection(3, 4, &parent2, &neat);
-    mutate_add_connection(2, 5, &parent2, &neat);
-    mutate_add_connection(5, 4, &parent2, &neat);
-    parent2.connections.connections[4].enabled = 0;
-    mutate_add_gene(5, 4, &parent2, &neat);
+//     mutate_add_connection(1, 4, &parent2, &neat);
+//     mutate_add_connection(2, 4, &parent2, &neat);
+//     parent2.connections.connections[1].enabled = 0;
+//     mutate_add_connection(3, 4, &parent2, &neat);
+//     mutate_add_connection(2, 5, &parent2, &neat);
+//     mutate_add_connection(5, 4, &parent2, &neat);
+//     parent2.connections.connections[4].enabled = 0;
+//     mutate_add_gene(5, 4, &parent2, &neat);
 
-    mutate_add_connection(1, 5, &parent1, &neat);
+//     mutate_add_connection(1, 5, &parent1, &neat);
 
-    mutate_add_connection(3, 5, &parent2, &neat);
-    mutate_add_connection(1, 6, &parent2, &neat);
+//     mutate_add_connection(3, 5, &parent2, &neat);
+//     mutate_add_connection(1, 6, &parent2, &neat);
 
-    print_genome(&neat, &parent1);
-    print_genome(&neat, &parent2);
+//     print_genome(&neat, &parent1);
+//     print_genome(&neat, &parent2);
 
-    neat_entity_t a, b;
-    a.genome = parent1;
-    b.genome = parent2;
-    a.score = 10;
-    b.score = 100;
+//     neat_entity_t a, b;
+//     a.genome = parent1;
+//     b.genome = parent2;
+//     a.score = 10;
+//     b.score = 100;
 
-    genome_t offspring = genome_crossover(&neat, &parent2, &parent1);
+//     genome_t offspring = genome_crossover(&neat, &parent2, &parent1);
 
-    print_genome(&neat, &offspring);
+//     print_genome(&neat, &offspring);
 
-    printf("Distance between the parents: %f\n", genome_distance(&parent2, &parent1));
-    printf("Distance between the parents: %f\n", genome_distance(&parent1, &parent2));
+//     printf("Distance between the parents: %f\n", genome_distance(&parent2, &parent1));
+//     printf("Distance between the parents: %f\n", genome_distance(&parent1, &parent2));
 
-    float inputs[4] = {
-                       1.5f,
-                       4.2f,
-                       2.3f,
-                       3.1f
-    };
+//     float inputs[4] = {
+//                        1.5f,
+//                        4.2f,
+//                        2.3f,
+//                        3.1f
+//     };
 
-    float outputs[2] = {
-                        0.0f, 0.0f
-    };
+//     float outputs[2] = {
+//                         0.0f, 0.0f
+//     };
 
-    run_genome(&neat, &parent1, inputs, outputs);
+//     run_genome(&neat, &parent1, inputs, outputs);
 
-    printf("Outputs: %f %f\n", outputs[0], outputs[1]);
+//     printf("Outputs: %f %f\n", outputs[0], outputs[1]);
 
-    run_genome(&neat, &parent2, inputs, outputs);
+//     run_genome(&neat, &parent2, inputs, outputs);
 
-    printf("Outputs: %f %f\n", outputs[0], outputs[1]);
+//     printf("Outputs: %f %f\n", outputs[0], outputs[1]);
 
-    neat_universe_t universe = {};
-    universe_init(&universe, 3, 4, 2);
+//     neat_universe_t universe = {};
+//     universe_init(&universe, 3, 4, 2);
 
-    universe.neat = neat;
-    universe.entities[0].genome = parent1;
-    universe.entities[1].genome = parent2;
-    universe.entities[2].genome = offspring;
+//     universe.neat = neat;
+//     universe.entities[0].genome = parent1;
+//     universe.entities[1].genome = parent2;
+//     universe.entities[2].genome = offspring;
 
-    universe.entities[0].score = 10.0f;
-    universe.entities[1].score = 3.0f;
-    universe.entities[2].score = 5.0f;
+//     universe.entities[0].score = 10.0f;
+//     universe.entities[1].score = 3.0f;
+//     universe.entities[2].score = 5.0f;
 
-    end_evaluation_and_evolve(&universe);
-}
+//     end_evaluation_and_evolve(&universe);
+// }
 
 int32_t main(
     int argc,
